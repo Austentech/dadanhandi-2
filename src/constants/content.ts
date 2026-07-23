@@ -1,4 +1,5 @@
 import type { Testimonial, Branch, JobListing, CareerPerk, TimelineEntry, PopupQuestion, FeatureCard, DishCard, MenuCategory, Review } from "@/types";
+export { SITE_CONFIG } from "@/constants/site";
 
 export const HERO_CONTENT = {
   titleHindi: "ददन हांडी मटन",

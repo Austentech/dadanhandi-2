@@ -1,4 +1,4 @@
-import { BRANCHES, SITE_CONFIG } from "@/constants/content";
+import { BRANCHES } from "@/constants/content";
 
 export default function BranchesSection() {
   return (

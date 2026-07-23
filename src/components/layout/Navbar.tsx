@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_LINKS, SITE_CONFIG } from "@/constants/site";
@@ -9,6 +9,12 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const mobileOpenRef = useRef(false);
+
+  const closeMobile = useCallback(() => {
+    mobileOpenRef.current = false;
+    setMobileOpen(false);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -16,11 +22,20 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Close mobile nav on route change — standard Next.js pattern
   useEffect(() => {
-    setMobileOpen(false);
+    if (mobileOpenRef.current) {
+      mobileOpenRef.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMobileOpen(false);
+    }
   }, [pathname]);
 
-  const toggleMobile = useCallback(() => setMobileOpen((p) => !p), []);
+  const toggleMobile = useCallback(() => {
+    const next = !mobileOpenRef.current;
+    mobileOpenRef.current = next;
+    setMobileOpen(next);
+  }, []);
 
   return (
     <nav className="navbar" style={scrolled ? { boxShadow: "0 2px 24px rgba(122,12,12,0.25)" } : undefined}>

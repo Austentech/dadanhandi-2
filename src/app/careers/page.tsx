@@ -1,6 +1,5 @@
 "use client";
 
-import { type Metadata } from "next";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -9,11 +8,6 @@ import FloatingButtons from "@/components/ui-custom/FloatingButtons";
 import ScrollReveal from "@/components/ui-custom/ScrollReveal";
 import HungerPopup from "@/components/ui-custom/HungerPopup";
 import { CAREER_PERKS, JOB_LISTINGS, SITE_CONFIG } from "@/constants/content";
-
-export const metadata: Metadata = {
-  title: "Careers – Dadan Handi Mutton Hotel | Jobs in Patna Bihar",
-  description: "Join the Dadan Handi Mutton Hotel team. We're hiring kitchen staff and more in Patna, Bihar. Apply now via WhatsApp.",
-};
 
 export default function CareersPage() {
   const handleApply = (positionName: string) => {

@@ -1,5 +1,20 @@
 import type { Metadata } from "next";
+import { Playfair_Display, Nunito } from "next/font/google";
 import "./globals.css";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "700", "900"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["300", "400", "600", "700"],
+  variable: "--font-nunito",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Dadan Handi Mutton Hotel – Authentic Bihar Non-Veg Restaurant, Patna Since 1985",
@@ -31,20 +46,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Tiro+Devanagari+Hindi:wght@400;700&family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
         <link rel="preload" as="image" href="/images/hero-handi.webp" type="image/webp" />
-        <style>{`
-          :root {
-            --font-playfair: 'Playfair Display', serif;
-            --font-nunito: 'Nunito', sans-serif;
-            --font-tiro: 'Tiro Devanagari Hindi', serif;
-          }
-        `}</style>
       </head>
-      <body className="bg-[#FDF3E3] text-[#4A2010]">
+      <body className={`${playfair.variable} ${nunito.variable} bg-[#FDF3E3] text-[#4A2010]`}>
         {children}
       </body>
     </html>

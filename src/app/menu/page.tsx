@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { type Metadata } from "next";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -10,11 +9,6 @@ import FloatingButtons from "@/components/ui-custom/FloatingButtons";
 import ScrollReveal from "@/components/ui-custom/ScrollReveal";
 import HungerPopup from "@/components/ui-custom/HungerPopup";
 import { MENU_CATEGORIES, SITE_CONFIG } from "@/constants/content";
-
-export const metadata: Metadata = {
-  title: "Menu – Dadan Handi Mutton Hotel | Authentic Bihar Non-Veg Menu Patna",
-  description: "Full menu of Dadan Handi Mutton Hotel – Handi Mutton ₹1100/kg, Thali meals, Tandoori, Fish, Egg Curry and more. Order on WhatsApp instantly.",
-};
 
 const FILTER_OPTIONS = [
   { id: "all", label: "All" },

@@ -958,7 +958,7 @@ footer {
   text-shadow: 0 2px 20px rgba(0,0,0,0.4);
 }
 
-.page-hero-title span { color: #FF3333; }
+.page-hero-title span { color: var(--mustard-bright); }
 
 /* ---- SCROLL REVEAL ---- */
 .reveal {
@@ -1213,7 +1213,7 @@ footer {
   font-family: var(--font-playfair), serif;
   font-size: clamp(1.4rem, 3vw, 2rem);
   font-weight: 800;
-  color: #fff;
+  color: #FF3333;
   margin: 0;
   white-space: nowrap;
 }

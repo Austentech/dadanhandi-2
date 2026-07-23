@@ -1,0 +1,611 @@
+     1→<!DOCTYPE html>
+     2→<html lang="en">
+     3→<head>
+     4→  <meta charset="UTF-8"/>
+     5→  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+     6→  <title>Menu – Dadan Handi Mutton Hotel | Authentic Bihar Non-Veg Menu Patna</title>
+     7→  <meta name="description" content="Full menu of Dadan Handi Mutton Hotel – Handi Mutton ₹1100/kg, Thali meals, Tandoori, Fish, Egg Curry and more. Order on WhatsApp instantly."/>
+     8→  <meta name="keywords" content="handi mutton patna, non veg restaurant patna, bihar food, mutton menu patna, chicken handi price, handi mutton thali"/>
+     9→  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+    10→  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    11→  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Tiro+Devanagari+Hindi&family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+    12→  <link rel="stylesheet" href="style.css"/>
+    13→</head>
+    14→<body>
+    15→
+    16→<!-- NAVBAR -->
+    17→<nav class="navbar navbar-expand-lg">
+    18→  <div class="container">
+    19→    <a class="navbar-brand" href="index.html">
+    20→      <img src="IMG_7709-removebg-preview.png" alt="Dadan Handi Mutton Hotel Logo" class="brand-logo"/>
+    21→      <div class="brand-text-wrap">
+    22→        <div class="brand-name"><b>Dadan Handi Mutton Hotel</b></div>
+    23→        <div class="brand-sub">Since 1985 · Patna, Bihar</div>
+    24→      </div>
+    25→    </a>
+    26→    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+    27→      <span class="navbar-toggler-icon"></span>
+    28→    </button>
+    29→    <div class="collapse navbar-collapse" id="mainNav">
+    30→      <ul class="navbar-nav ms-auto">
+    31→        <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+    32→        <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
+    33→        <li class="nav-item"><a class="nav-link active" href="menu.html">Menu</a></li>
+    34→        <li class="nav-item"><a class="nav-link" href="testimonials.html">Reviews</a></li>
+    35→        <li class="nav-item"><a class="nav-link" href="blog.html">Blog</a></li>
+    36→        <li class="nav-item"><a class="nav-link" href="career.html">Careers</a></li>
+    37→        <li class="nav-item"><a class="nav-link" href="contact.html">Contact</a></li>
+    38→      </ul>
+    39→    </div>
+    40→  </div>
+    41→</nav>
+    42→
+    43→<!-- PAGE HERO -->
+    44→<section class="page-hero">
+    45→  <div class="container position-relative">
+    46→    <nav aria-label="breadcrumb" class="mb-3">
+    47→      <ol class="breadcrumb">
+    48→        <li class="breadcrumb-item"><a href="index.html">Home</a></li>
+    49→        <li class="breadcrumb-item active">Menu</li>
+    50→      </ol>
+    51→    </nav>
+    52→    <h1 class="page-hero-title">Our <span>Menu</span></h1>
+    53→    <p style="color:#7A5030;font-size:1rem;margin-top:10px;">Authentic Bihar flavours – slow-cooked, real, unforgettable</p>
+    54→  </div>
+    55→</section>
+    56→
+    57→<!-- QUICK ORDER BANNER -->
+    58→<div style="background:linear-gradient(135deg,#1b7a3d,#15622f);padding:14px 0;text-align:center;">
+    59→  <div class="container d-flex flex-wrap align-items-center justify-content-center gap-3">
+    60→    <span style="color:#fff;font-size:0.9rem;font-weight:600;"><i class="fab fa-whatsapp me-2"></i>Chat with us on WhatsApp to satisfy your cravings!</span>
+    61→    <a href="https://wa.me/918986496574?text=Hi%20I%20want%20to%20kwnow%20about%20your%20dishes" target="_blank" rel="noopener noreferrer"
+    62→       style="background:#fff;color:#1b7a3d;padding:6px 18px;border-radius:20px;font-weight:700;font-size:0.82rem;text-decoration:none;">
+    63→      Chat Now →
+    64→    </a>
+    65→  </div>
+    66→</div>
+    67→
+    68→<!-- MENU FILTER TABS -->
+    69→<div style="background:#FFF5E1;padding:16px 0;position:sticky;top:70px;z-index:100;border-bottom:2px solid #E8C98A;box-shadow:0 2px 10px rgba(196,106,46,0.1);">
+    70→  <div class="container">
+    71→    <ul class="nav justify-content-center flex-wrap menu-filter-tabs" id="menuFilter" style="gap:6px;">
+    72→      <li class="nav-item"><button class="nav-link active" data-filter="all">🍽 All</button></li>
+    73→      <li class="nav-item"><button class="nav-link" data-filter="main">🫕 Main Course</button></li>
+    74→      <li class="nav-item"><button class="nav-link" data-filter="thali">🍱 Thali</button></li>
+    75→      <li class="nav-item"><button class="nav-link" data-filter="dessert">🍮 Dessert</button></li>
+    76→    </ul>
+    77→  </div>
+    78→</div>
+    79→
+    80→<!-- MENU CONTENT -->
+    81→<section class="menu-page">
+    82→  <div class="container">
+    83→
+    84→    <!-- ===== MAIN COURSE ===== -->
+    85→    <div class="menu-section-block reveal" data-cat="main">
+    86→      <div class="menu-cat-heading">
+    87→        <h3 style="color: #7A0C0C;">Main <span>Course</span></h3>
+    88→        <div class="menu-cat-line"></div>
+    89→      </div>
+    90→      <div class="row g-3">
+    91→
+    92→        <div class="col-12 col-md-6">
+    93→          <div class="menu-item-card reveal reveal-delay-1">
+    94→            <div class="menu-item-img-placeholder">🫕</div>
+    95→            <div class="menu-item-body">
+    96→              <div class="menu-item-name"><b>Handi Mutton</b></div>
+    97→              <p class="menu-item-desc">Slow-cooked tender mutton in traditional clay handi with whole spices</p>
+    98→            </div>
+    99→            <div class="menu-item-right">
+   100→              <div>
+   101→                <div class="menu-item-price">₹1,200</div>
+   102→                <div class="menu-item-qty">per kg</div>
+   103→              </div>
+   104→              <!-- <button class="btn-order-now" data-item="Handi Mutton (1 kg)">
+   105→                <i class="fab fa-whatsapp"></i> Order
+   106→              </button> -->
+   107→            </div>
+   108→          </div>
+   109→        </div>
+   110→
+   111→        <div class="col-12 col-md-6">
+   112→          <div class="menu-item-card reveal reveal-delay-2">
+   113→            <div class="menu-item-img-placeholder">🔥</div>
+   114→            <div class="menu-item-body">
+   115→              <div class="menu-item-name"><b>Handi Mutton Sizzlers</b></div>
+   116→              <p class="menu-item-desc">Premium sizzling handi mutton served on a hot iron plate</p>
+   117→            </div>
+   118→            <div class="menu-item-right">
+   119→              <div>
+   120→                <div class="menu-item-price">₹1,400</div>
+   121→                <div class="menu-item-qty">per kg</div>
+   122→              </div>
+   123→              <!-- <button class="btn-order-now" data-item="Handi Mutton Sizzlers (1 kg)">
+   124→                <i class="fab fa-whatsapp"></i> Order
+   125→              </button> -->
+   126→            </div>
+   127→          </div>
+   128→        </div>
+   129→
+   130→        <div class="col-12 col-md-6">
+   131→          <div class="menu-item-card reveal reveal-delay-1">
+   132→            <div class="menu-item-img-placeholder">🍖</div>
+   133→            <div class="menu-item-body">
+   134→              <div class="menu-item-name"><b>Ishto Mutton</b></div>
+   135→              <p class="menu-item-desc">Bihari-style light mutton stew with potato, green chilli &amp; whole spices</p>
+   136→            </div>
+   137→            <div class="menu-item-right">
+   138→              <div>
+   139→                <div class="menu-item-price">₹420</div>
+   140→                <div class="menu-item-qty">per plate (6 pcs)</div>
+   141→              </div>
+   142→              <!-- <button class="btn-order-now" data-item="Isto Mutton (plate - 6 pieces)">
+   143→                <i class="fab fa-whatsapp"></i> Order
+   144→              </button> -->
+   145→            </div>
+   146→          </div>
+   147→        </div>
+   148→
+   149→        <div class="col-12 col-md-6">
+   150→          <div class="menu-item-card reveal reveal-delay-2">
+   151→            <div class="menu-item-img-placeholder">🍗</div>
+   152→            <div class="menu-item-body">
+   153→              <div class="menu-item-name"><b>Handi Chicken</b></div>
+   154→              <p class="menu-item-desc">Tender chicken slow-cooked in handi with rich masala gravy</p>
+   155→            </div>
+   156→            <div class="menu-item-right">
+   157→              <div>
+   158→                <div class="menu-item-price">₹700</div>
+   159→                <div class="menu-item-qty">per kg</div>
+   160→              </div>
+   161→              <!-- <button class="btn-order-now" data-item="Handi Chicken (1 kg)">
+   162→                <i class="fab fa-whatsapp"></i> Order
+   163→              </button> -->
+   164→            </div>
+   165→          </div>
+   166→        </div>
+   167→
+   168→        <div class="col-12 col-md-6">
+   169→          <div class="menu-item-card reveal reveal-delay-1">
+   170→            <div class="menu-item-img-placeholder">🍢</div>
+   171→            <div class="menu-item-body">
+   172→              <div class="menu-item-name"><b>Chicken Tikka</b></div>
+   173→              <p class="menu-item-desc">Marinated chicken on skewer, roasted in tandoor to smoky perfection</p>
+   174→            </div>
+   175→            <div class="menu-item-right">
+   176→              <div>
+   177→                <div class="menu-item-price">₹150</div>
+   178→                <div class="menu-item-qty">per stick</div>
+   179→              </div>
+   180→              <!-- <button class="btn-order-now" data-item="Chicken Tikka (per stick)">
+   181→                <i class="fab fa-whatsapp"></i> Order
+   182→              </button> -->
+   183→            </div>
+   184→          </div>
+   185→        </div>
+   186→
+   187→        <div class="col-12 col-md-6">
+   188→          <div class="menu-item-card reveal reveal-delay-2">
+   189→            <div class="menu-item-img-placeholder">🐟</div>
+   190→            <div class="menu-item-body">
+   191→              <div class="menu-item-name"><b>Fish Fry</b></div>
+   192→              <p class="menu-item-desc">Crispy fried fresh fish with desi spice rub – crunchy outside, juicy inside</p>
+   193→            </div>
+   194→            <div class="menu-item-right">
+   195→              <div>
+   196→                <div class="menu-item-price">₹420</div>
+   197→                <div class="menu-item-qty">per plate (6 pcs)</div>
+   198→              </div>
+   199→              <!-- <button class="btn-order-now" data-item="Fish Fry (plate - 6 pieces)">
+   200→                <i class="fab fa-whatsapp"></i> Order
+   201→              </button> -->
+   202→            </div>
+   203→          </div>
+   204→        </div>
+   205→
+   206→        <div class="col-12 col-md-6">
+   207→          <div class="menu-item-card reveal reveal-delay-1">
+   208→            <div class="menu-item-img-placeholder">🍛</div>
+   209→            <div class="menu-item-body">
+   210→              <div class="menu-item-name"><b>Fish Curry</b></div>
+   211→              <p class="menu-item-desc">Fresh river fish in spicy and tangy Bihar-style masala gravy</p>
+   212→            </div>
+   213→            <div class="menu-item-right">
+   214→              <div>
+   215→                <div class="menu-item-price">₹420</div>
+   216→                <div class="menu-item-qty">per plate (6 pcs)</div>
+   217→              </div>
+   218→              <!-- <button class="btn-order-now" data-item="Fish Curry (plate - 6 pieces)">
+   219→                <i class="fab fa-whatsapp"></i> Order
+   220→              </button> -->
+   221→            </div>
+   222→          </div>
+   223→        </div>
+   224→
+   225→        <div class="col-12 col-md-6">
+   226→          <div class="menu-item-card reveal reveal-delay-2">
+   227→            <div class="menu-item-img-placeholder">🥚</div>
+   228→            <div class="menu-item-body">
+   229→              <div class="menu-item-name"><b>Egg Curry</b></div>
+   230→              <p class="menu-item-desc">Whole boiled eggs in rich, aromatic desi masala gravy</p>
+   231→            </div>
+   232→            <div class="menu-item-right">
+   233→              <div>
+   234→                <div class="menu-item-price">₹130</div>
+   235→                <div class="menu-item-qty">per plate (6 pcs)</div>
+   236→              </div>
+   237→              <!-- <button class="btn-order-now" data-item="Egg Curry (plate - 6 pieces)">
+   238→                <i class="fab fa-whatsapp"></i> Order
+   239→              </button> -->
+   240→            </div>
+   241→          </div>
+   242→        </div>
+   243→
+   244→        <div class="col-12 col-md-6">
+   245→          <div class="menu-item-card reveal reveal-delay-1">
+   246→            <div class="menu-item-img-placeholder">🍚</div>
+   247→            <div class="menu-item-body">
+   248→              <div class="menu-item-name"><b>Rice</b></div>
+   249→              <p class="menu-item-desc">Plain steamed rice – the perfect companion for our rich handi gravies</p>
+   250→            </div>
+   251→            <div class="menu-item-right">
+   252→              <div>
+   253→                <div class="menu-item-price">₹60</div>
+   254→                <div class="menu-item-qty">per plate</div>
+   255→              </div>
+   256→              <!-- <button class="btn-order-now" data-item="Rice (1 plate)">
+   257→                <i class="fab fa-whatsapp"></i> Order
+   258→              </button> -->
+   259→            </div>
+   260→          </div>
+   261→        </div>
+   262→
+   263→        <div class="col-12 col-md-6">
+   264→          <div class="menu-item-card reveal reveal-delay-2">
+   265→            <div class="menu-item-img-placeholder">🫓</div>
+   266→            <div class="menu-item-body">
+   267→              <div class="menu-item-name"><b>Roti (Fulka)</b></div>
+   268→              <p class="menu-item-desc">Soft whole wheat fulka, freshly made on tawa. Light and fluffy</p>
+   269→            </div>
+   270→            <div class="menu-item-right">
+   271→              <div>
+   272→                <div class="menu-item-price">₹10</div>
+   273→                <div class="menu-item-qty">per piece</div>
+   274→              </div>
+   275→              <!-- <button class="btn-order-now" data-item="Roti / Fulka">
+   276→                <i class="fab fa-whatsapp"></i> Order
+   277→              </button> -->
+   278→            </div>
+   279→          </div>
+   280→        </div>
+   281→
+   282→        <div class="col-12 col-md-6">
+   283→          <div class="menu-item-card reveal reveal-delay-1">
+   284→            <div class="menu-item-img-placeholder">🟤</div>
+   285→            <div class="menu-item-body">
+   286→              <div class="menu-item-name"><b>Litti</b></div>
+   287→              <p class="menu-item-desc">Traditional Bihar-style litti — crispy roasted wheat balls stuffed with sattu</p>
+   288→            </div>
+   289→            <div class="menu-item-right">
+   290→              <div>
+   291→                <div class="menu-item-price">₹15</div>
+   292→                <div class="menu-item-qty">per piece</div>
+   293→              </div>
+   294→              <!-- <button class="btn-order-now" data-item="Litti">
+   295→                <i class="fab fa-whatsapp"></i> Order
+   296→              </button> -->
+   297→            </div>
+   298→          </div>
+   299→        </div>
+   300→
+   301→      </div><!-- /row main course -->
+   302→    </div><!-- /main course block -->
+   303→
+   304→    <!-- ===== THALI ===== -->
+   305→    <div class="menu-section-block reveal" data-cat="thali">
+   306→      <div class="menu-cat-heading">
+   307→        <h3 style="color: #7A0C0C;">Thali <span>Meals</span></h3>
+   308→        <div class="menu-cat-line"></div>
+   309→      </div>
+   310→
+   311→      <!-- Unlimited highlight -->
+   312→      <div class="thali-highlight reveal">
+   313→        <div class="thali-highlight-icon">♾️</div>
+   314→        <p>
+   315→          <i class="fas fa-star" style="color:#F4C430;margin-right:6px;"></i>
+   316→          Unlimited Roti &amp; Rice with Every Thali!
+   317→          <span> — Each thali comes with unlimited roti and steamed rice per person at no extra charge.</span>
+   318→        </p>
+   319→      </div>
+   320→
+   321→      <div class="row g-3">
+   322→
+   323→        <div class="col-12 col-md-6">
+   324→          <div class="menu-item-card reveal reveal-delay-1" style="border-color:#7A0C0C;">
+   325→            <div class="menu-item-img-placeholder">🫕</div>
+   326→            <div class="menu-item-body">
+   327→              <div class="menu-item-name"><b>Handi Mutton Thali</b></div>
+   328→              <p class="menu-item-desc">200g handi mutton + unlimited roti + unlimited rice + salad + pickle</p>
+   329→            </div>
+   330→            <div class="menu-item-right">
+   331→              <div>
+   332→                <div class="menu-item-price">₹300</div>
+   333→                <!-- <div class="menu-item-qty">per person (100g)</div> -->
+   334→              </div>
+   335→              <!-- <button class="btn-order-now" data-item="Handi Mutton Thali (200g)">
+   336→                <i class="fab fa-whatsapp"></i> Order
+   337→              </button> -->
+   338→            </div>
+   339→          </div>
+   340→        </div>
+   341→
+   342→        <div class="col-12 col-md-6">
+   343→          <div class="menu-item-card reveal reveal-delay-2">
+   344→            <div class="menu-item-img-placeholder">🍖</div>
+   345→            <div class="menu-item-body">
+   346→              <div class="menu-item-name"><b>Isto Mutton Thali</b></div>
+   347→              <p class="menu-item-desc">3 pieces isto mutton + unlimited roti + unlimited rice + salad</p>
+   348→            </div>
+   349→            <div class="menu-item-right">
+   350→              <div>
+   351→                <div class="menu-item-price">₹270</div>
+   352→                <!-- <div class="menu-item-qty">per person (3 pcs)</div> -->
+   353→              </div>
+   354→              <!-- <button class="btn-order-now" data-item="Isto Mutton Thali (3 pieces)">
+   355→                <i class="fab fa-whatsapp"></i> Order
+   356→              </button> -->
+   357→            </div>
+   358→          </div>
+   359→        </div>
+   360→
+   361→        <div class="col-12 col-md-6">
+   362→          <div class="menu-item-card reveal reveal-delay-1">
+   363→            <div class="menu-item-img-placeholder">🍗</div>
+   364→            <div class="menu-item-body">
+   365→              <div class="menu-item-name"><b>Handi Chicken Thali</b></div>
+   366→              <p class="menu-item-desc">200g handi chicken + unlimited roti + unlimited rice + salad + pickle</p>
+   367→            </div>
+   368→            <div class="menu-item-right">
+   369→              <div>
+   370→                <div class="menu-item-price">₹200</div>
+   371→                <!-- <div class="menu-item-qty">per person (200g)</div> -->
+   372→              </div>
+   373→              <!-- <button class="btn-order-now" data-item="Handi Chicken Thali (200g)">
+   374→                <i class="fab fa-whatsapp"></i> Order
+   375→              </button> -->
+   376→            </div>
+   377→          </div>
+   378→        </div>
+   379→
+   380→        <div class="col-12 col-md-6">
+   381→          <div class="menu-item-card reveal reveal-delay-2">
+   382→            <div class="menu-item-img-placeholder">🐟</div>
+   383→            <div class="menu-item-body">
+   384→              <div class="menu-item-name"><b>Fish Curry Thali</b></div>
+   385→              <p class="menu-item-desc">3 pieces fish curry + unlimited roti + unlimited rice + salad + pickle</p>
+   386→            </div>
+   387→            <div class="menu-item-right">
+   388→              <div>
+   389→                <div class="menu-item-price">₹270</div>
+   390→                <!-- <div class="menu-item-qty">per person (3 pcs)</div> -->
+   391→              </div>
+   392→              <!-- <button class="btn-order-now" data-item="Fish Curry Thali (3 pieces)">
+   393→                <i class="fab fa-whatsapp"></i> Order
+   394→              </button> -->
+   395→            </div>
+   396→          </div>
+   397→        </div>
+   398→
+   399→        <div class="col-12 col-md-6">
+   400→          <div class="menu-item-card reveal reveal-delay-1">
+   401→            <div class="menu-item-img-placeholder">🥚</div>
+   402→            <div class="menu-item-body">
+   403→              <div class="menu-item-name"><b>Egg Curry Thali</b></div>
+   404→              <p class="menu-item-desc">2 pieces egg curry + unlimited roti + unlimited rice + salad + pickle</p>
+   405→            </div>
+   406→            <div class="menu-item-right">
+   407→              <div>
+   408→                <div class="menu-item-price">₹120</div>
+   409→                <!-- <div class="menu-item-qty">per person (2 pcs)</div> -->
+   410→              </div>
+   411→              <!-- <button class="btn-order-now" data-item="Egg Curry Thali (2 pieces)">
+   412→                <i class="fab fa-whatsapp"></i> Order
+   413→              </button> -->
+   414→            </div>
+   415→          </div>
+   416→        </div>
+   417→
+   418→      </div><!-- /row thali -->
+   419→    </div><!-- /thali block -->
+   420→
+   421→    <!-- ===== DESSERT ===== -->
+   422→    <div class="menu-section-block reveal" data-cat="dessert">
+   423→      <div class="menu-cat-heading">
+   424→        <h3 style="color: #7A0C0C;">Sweet <span>Ending</span></h3>
+   425→        <div class="menu-cat-line"></div>
+   426→      </div>
+   427→      <div class="row g-3">
+   428→        <div class="col-12 col-md-6">
+   429→          <div class="menu-item-card reveal reveal-delay-1">
+   430→            <div class="menu-item-img-placeholder">🍮</div>
+   431→            <div class="menu-item-body">
+   432→              <div class="menu-item-name"><b>Sweets</b></div>
+   433→              <p class="menu-item-desc">Traditional Indian mithai – the perfect sweet note to end a royal meal</p>
+   434→            </div>
+   435→            <div class="menu-item-right">
+   436→              <div>
+   437→                <div class="menu-item-price">₹25</div>
+   438→                <div class="menu-item-qty">per piece</div>
+   439→              </div>
+   440→              <!-- <button class="btn-order-now" data-item="Sweets (Mithai)">
+   441→                <i class="fab fa-whatsapp"></i> Order
+   442→              </button> -->
+   443→            </div>
+   444→          </div>
+   445→        </div>
+   446→      </div>
+   447→    </div><!-- /dessert block -->
+   448→
+   449→    <!-- BOTTOM CTA -->
+   450→    <div class="text-center mt-5 reveal">
+   451→      <div style="background:#FFFFFF;border:1.5px solid #E8C98A;border-radius:12px;padding:36px 24px;max-width:560px;margin:0 auto;">
+   452→        <div style="font-family:'Tiro Devanagari Hindi',serif;font-size:1.5rem;color:#7A0C0C;margin-bottom:10px;">अभी ऑर्डर करें! 🫕</div>
+   453→        <p style="color:#7A5030;font-size:0.88rem;margin-bottom:22px;">Call, WhatsApp, or order online for home delivery.</p>
+   454→        <div class="d-flex flex-wrap justify-content-center gap-3">
+   455→      <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" target="_blank" rel="noopener noreferrer" class="btn-hero-primary">
+   456→        <i class="fas fa-motorcycle"></i> Order on Zomato
+   457→      </a>
+   458→      <a href="https://www.swiggy.com/city/patna/dadan-handi-mutton-hotel-khajpura-khajpura-rest1331535/" target="_blank" rel="noopener noreferrer" class="btn-hero-primary">
+   459→        <i class="fas fa-motorcycle"></i> Order on Swiggy
+   460→      </a>
+   461→    </div>
+   462→      </div>
+   463→    </div>
+   464→
+   465→  </div>
+   466→</section>
+   467→
+   468→<!-- FOOTER -->
+   469→<footer>
+   470→  <div class="container">
+   471→    <div class="row g-5">
+   472→      <div class="col-md-4">
+   473→        <div class="footer-logo-text">Dadan Handi Mutton Hotel</div>
+   474→        <div class="footer-tagline">शेर दिल वाले ही मटन खाते हैं!<br> शेर कभी घास नहीं खाता हैं!</div>
+   475→        
+   476→        <p style="color:#7A5030;font-size:0.82rem;margin-top:14px;line-height:1.8;">
+   477→          Bihar's most loved handi mutton restaurant since 1985. Authentic recipes, traditional cooking, real flavours.
+   478→        </p>
+   479→        <div class="social-icons mt-3">
+   480→          <a href="https://www.facebook.com/share/189QrQxb1q/" class="social-icon"><i class="fab fa-facebook-f"></i></a>
+   481→          <a href="https://www.instagram.com/dadan_handi.ofc?igsh=MWh0c245amZyN2hzNw==" class="social-icon"><i class="fab fa-instagram"></i></a>
+   482→          <a href="https://youtube.com/@dadanhandimuttonhotel?si=DhuO64OBMpF7cSLJ" class="social-icon"><i class="fab fa-youtube"></i></a>
+   483→          <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" class="social-icon" title="Zomato"><i class="fas fa-utensils"></i></a>
+   484→        </div>
+   485→      </div>
+   486→      <div class="col-md-2 col-6">
+   487→        <h6>Quick Links</h6>
+   488→        <ul class="footer-links">
+   489→          <li><a href="index.html">Home</a></li>
+   490→          <li><a href="about.html">About Us</a></li>
+   491→          <li><a href="menu.html">Menu</a></li>
+   492→          <li><a href="testimonials.html">Reviews</a></li>
+   493→          <li><a href="blog.html">Blog</a></li>
+   494→          <li><a href="career.html">Careers</a></li>
+   495→          <li><a href="contact.html">Contact</a></li>
+   496→        </ul>
+   497→      </div>
+   498→      <div class="col-md-2 col-6">
+   499→        <h6>Menu</h6>
+   500→        <ul class="footer-links">
+   501→          <li><a href="menu.html">Main Course</a></li>
+   502→          <li><a href="menu.html">Thali Meals</a></li>
+   503→          <li><a href="menu.html">Desserts</a></li>
+   504→        </ul>
+   505→      </div>
+   506→      <div class="col-md-4">
+   507→        <h6>Main Branch</h6>
+   508→        <address class="footer-address">
+   509→          <i class="fas fa-map-marker-alt me-2" style="color:#C46A2E;"></i>
+   510→          Saguna Khagaul Road, Kaliket Nagar,<br>Danapur, Patna, Bihar – 801105
+   511→        </address>
+   512→        <div class="mt-3">
+   513→          <div class="mt-3">
+   514→          <a href="tel:8986496574" style="color:#C46A2E;text-decoration:none;font-size:0.9rem;font-weight:700;font-weight:700;">
+   515→            <i class="fas fa-phone me-2" style="color:#C46A2E;"></i>8986496574</br>
+   516→            <i class="fas fa-clock me-2" style="color:#C46A2E;"></i>Sun - Sat (10:00 AM - 10:00 PM)
+   517→          </a>
+   518→        </div>
+   519→        <div class="mt-2">
+   520→          <a href="https://wa.me/918986496574" target="_blank" rel="noopener noreferrer" style="color:#1b7a3d;text-decoration:none;font-size:0.85rem;">
+   521→            <i class="fab fa-whatsapp me-2"></i>WhatsApp
+   522→          </a>
+   523→        </div>
+   524→        </div>
+   525→      </div>
+   526→    </div>
+   527→    <div class="footer-bottom">
+   528→      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+   529→         <span>&copy; 2026 Dadan Handi Mutton Hotel. All rights reserved.</span>
+   530→        <span>Crafted with code and curiosity by <a href="#" target="_blank" >Sankhya Stack 💡</a></span>
+   531→      </div>
+   532→    </div>
+   533→  </div>
+   534→</footer>
+   535→
+   536→<a href="https://wa.me/918986496574?text=Hi%20I%20want%20to%20order%20food" target="_blank" rel="noopener noreferrer" class="floating-whatsapp" aria-label="WhatsApp Order"><i class="fab fa-whatsapp"></i></a>
+   537→<a href="tel:8986496574" class="floating-call" aria-label="Call Now"><i class="fas fa-phone"></i></a>
+   538→<button id="backToTop" aria-label="Back to top"><i class="fas fa-arrow-up"></i></button>
+   539→
+   540→<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+   541→<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+   542→<script src="script.js"></script>
+   543→
+   544→<!-- ============================================================
+   545→     HUNGER POPUP — 3 HINDI QUESTIONS (auto-shows after 5s)
+   546→     ============================================================ -->
+   547→<div class="modal fade" id="hungerPopup" tabindex="-1" aria-labelledby="hungerPopupLabel" aria-hidden="true">
+   548→  <div class="modal-dialog modal-dialog-centered">
+   549→    <div class="modal-content">
+   550→      <div class="popup-progress-bar"></div>
+   551→      <div class="modal-header">
+   552→        <h5 class="modal-title" id="hungerPopupLabel">🍲 Dadan Handi Mutton Hotel</h5>
+   553→        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+   554→      </div>
+   555→      <div class="modal-body">
+   556→        <!-- Q1 -->
+   557→        <div class="popup-question active" id="popQ1">
+   558→          <div class="popup-emoji">🤤</div>
+   559→          <div class="popup-question-text">भूख लगी है?</div>
+   560→          <div class="popup-sub-text">Patna ke sabse authentic handi mutton ke liye ready ho jaao!</div>
+   561→          <div class="popup-btn-wrap">
+   562→            <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" target="_blank" rel="noopener noreferrer" class="popup-btn-zomato">
+   563→              <i class="fas fa-utensils"></i> Zomato
+   564→            </a>
+   565→            <a href="https://www.swiggy.com/city/patna/dadan-handi-mutton-hotel-khajpura-khajpura-rest1331535/" target="_blank" rel="noopener noreferrer" class="popup-btn-swiggy">
+   566→              <i class="fas fa-motorcycle"></i> Swiggy
+   567→            </a>
+   568→          </div>
+   569→        </div>
+   570→        <!-- Q2 -->
+   571→        <div class="popup-question" id="popQ2">
+   572→          <div class="popup-emoji">🫕</div>
+   573→          <div class="popup-question-text">आज हांडी मटन बना है!</div>
+   574→          <div class="popup-sub-text">Mitti ki handi mein slow-cooked, 1985 se — ekdum asli swaad!</div>
+   575→          <div class="popup-btn-wrap">
+   576→            <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" target="_blank" rel="noopener noreferrer" class="popup-btn-zomato">
+   577→              <i class="fas fa-utensils"></i> Zomato
+   578→            </a>
+   579→            <a href="https://www.swiggy.com/city/patna/dadan-handi-mutton-hotel-khajpura-khajpura-rest1331535/" target="_blank" rel="noopener noreferrer" class="popup-btn-swiggy">
+   580→              <i class="fas fa-motorcycle"></i> Swiggy
+   581→            </a>
+   582→          </div>
+   583→        </div>
+   584→        <!-- Q3 -->
+   585→        <div class="popup-question" id="popQ3">
+   586→          <div class="popup-emoji">😋</div>
+   587→          <div class="popup-question-text">कौन सा डिश आज आजमाना चाहते हैं?</div>
+   588→          <div class="popup-sub-text">Choose karo aur seedha order karo WhatsApp par!</div>
+   589→          <div class="popup-btn-wrap">
+   590→            <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" target="_blank" rel="noopener noreferrer" class="popup-btn-wa" style="font-size:0.8rem;padding:10px 16px;">🫕 Mutton Thali</a>
+   591→            <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" target="_blank" rel="noopener noreferrer" class="popup-btn-wa" style="font-size:0.8rem;padding:10px 16px;">🍗 Chicken Handi</a>
+   592→            <a href="https://www.zomato.com/patna/dadan-handi-mutton-hotel-adampur/" target="_blank" rel="noopener noreferrer" class="popup-btn-wa" style="font-size:0.8rem;padding:10px 16px;">🐟 Fish Curry</a>
+   593→          </div>
+   594→        </div>
+   595→        <!-- Dots -->
+   596→        <div class="popup-dots">
+   597→          <div class="popup-dot active" data-q="0"></div>
+   598→          <div class="popup-dot" data-q="1"></div>
+   599→          <div class="popup-dot" data-q="2"></div>
+   600→        </div>
+   601→      </div>
+   602→      <div class="modal-footer">
+   603→        <span class="popup-skip-text">✕ &nbsp;बाद में देखूँगा (Skip)</span>
+   604→      </div>
+   605→    </div>
+   606→  </div>
+   607→</div>
+   608→
+   609→</body>
+   610→</html>
+   611→

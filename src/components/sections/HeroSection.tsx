@@ -6,11 +6,28 @@ import { HERO_CONTENT } from "@/constants/content";
 
 export default function HeroSection() {
   const heroBgRef = useRef<HTMLDivElement>(null);
+  const smokeContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setTimeout(() => {
       if (heroBgRef.current) heroBgRef.current.classList.add("loaded");
     }, 100);
+
+    // Generate smoke particles imperatively to avoid hydration mismatch
+    const container = smokeContainerRef.current;
+    if (container) {
+      for (let i = 0; i < 6; i++) {
+        const el = document.createElement("div");
+        el.className = "smoke-particle";
+        const sz = Math.random() * 55 + 88;
+        el.style.width = `${sz}px`;
+        el.style.height = `${sz}px`;
+        el.style.left = `${Math.random() * 100}%`;
+        el.style.animationDuration = `${Math.random() * 12 + 10}s`;
+        el.style.animationDelay = `${Math.random() * 8}s`;
+        container.appendChild(el);
+      }
+    }
 
     if (window.innerWidth > 768) {
       const heroH = document.querySelector(".hero-section")?.getBoundingClientRect().height || 0;
@@ -25,15 +42,6 @@ export default function HeroSection() {
     }
   }, []);
 
-  // Create smoke particles (matching live site JS behavior)
-  const smokeParticles = Array.from({ length: 6 }, (_, i) => {
-    const sz = Math.random() * 55 + 88;
-    const lft = Math.random() * 100;
-    const dur = Math.random() * 12 + 10;
-    const del = Math.random() * 8;
-    return { sz, lft, dur, del, key: i };
-  });
-
   return (
     <section className="hero-section">
       <div ref={heroBgRef} className="hero-bg"></div>
@@ -47,19 +55,8 @@ export default function HeroSection() {
         <div className="steam-wisp"></div>
       </div>
 
-      {smokeParticles.map((p) => (
-        <div
-          key={p.key}
-          className="smoke-particle"
-          style={{
-            width: `${p.sz}px`,
-            height: `${p.sz}px`,
-            left: `${p.lft}%`,
-            animationDuration: `${p.dur}s`,
-            animationDelay: `${p.del}s`,
-          }}
-        />
-      ))}
+      {/* Smoke particles are injected imperatively in useEffect to avoid hydration mismatch */}
+      <div ref={smokeContainerRef} aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2, overflow: "hidden" }}></div>
 
       <div className="hero-content">
         <div className="hero-since">⚔ Since 1985 · Bihar&apos;s Finest Handi ⚔</div>

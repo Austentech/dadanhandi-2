@@ -97,3 +97,18 @@ export interface DishCard {
   badge: string;
   image: string;
 }
+
+export interface HomeDish {
+  name: string;
+  description: string;
+  price: string;
+  quantity?: string;
+  badge?: string | null;
+  image?: string;
+}
+
+export interface HomeMenuTab {
+  id: string;
+  label: string;
+  dishes: HomeDish[];
+}

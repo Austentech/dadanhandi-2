@@ -5,17 +5,17 @@ export default function CTABanner() {
   return (
     <section className="cta-banner">
       <div className="container-custom" style={{ position: "relative" }}>
-        <div className="cta-hindi">हमारे साथ खाना खाएं! 🫕</div>
+        <div className="cta-hindi">भूख लगी है? अभी ऑर्डर करें! 🍲</div>
         <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "1rem", marginBottom: 32 }}>
-          Come taste the legacy. A handi that has been perfected over 39 years awaits you.
+          Real hunger deserves real handi. Don&apos;t settle for less.
         </p>
         <div className="cta-btns-wrap" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14 }}>
-          <Link href="/menu" className="btn-hero-primary">
-            <i className="fas fa-book-open"></i> View Our Menu
-          </Link>
-          <Link href="/contact" className="btn-hero-secondary" style={{ borderColor: "#fff", color: "#fff" }}>
-            <i className="fas fa-map-marker-alt"></i> Find Us
-          </Link>
+          <a href={SITE_CONFIG.zomatoLink} target="_blank" rel="noopener noreferrer" className="btn-hero-primary">
+            <i className="fas fa-motorcycle"></i> Order on Zomato
+          </a>
+          <a href={SITE_CONFIG.swiggyLink} target="_blank" rel="noopener noreferrer" className="btn-hero-primary">
+            <i className="fas fa-motorcycle"></i> Order on Swiggy
+          </a>
         </div>
       </div>
     </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { HOME_REVIEWS } from "@/constants/content";
+import { HOME_REVIEWS, RATING_SUMMARY } from "@/constants/content";
 
 export default function ReviewsSection() {
   const [current, setCurrent] = useState(0);
@@ -25,60 +25,68 @@ export default function ReviewsSection() {
   return (
     <section className="ratings-section">
       <div className="container-custom">
-        <div className="text-center reveal">
-          <div className="section-badge">Testimonials</div>
-          <h2 className="section-title" style={{ marginTop: 8 }}>What Customers <span>Say</span></h2>
+        <div className="text-center" style={{ marginBottom: 48 }}>
+          <div className="section-badge">Customer Reviews</div>
+          <h2 className="section-title" style={{ marginTop: 8 }}>What People <span>Are Saying</span></h2>
           <div className="section-divider"></div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 48 }}>
-          <div className="rating-big reveal">3.7</div>
-          <div style={{ color: "#C46A2E", fontSize: "1.3rem", margin: "8px 0" }}>⭐⭐⭐⭐</div>
-          <div style={{ color: "#7A5030", fontSize: "0.82rem" }}>Overall Rating</div>
-        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 32, alignItems: "center" }}>
+          {/* Rating Summary - Left */}
+          <div className="text-center reveal">
+            <div className="rating-big">{RATING_SUMMARY.overall}</div>
+            <div className="star-display" style={{ color: "#C46A2E", fontSize: "1.5rem", margin: "8px 0" }}>
+              {RATING_SUMMARY.stars}
+            </div>
+            <p style={{ color: "#7A5030", fontSize: "0.82rem" }}>{RATING_SUMMARY.subtitle}</p>
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+              <a href="#" target="_blank" rel="noopener noreferrer" style={{
+                color: "#7A0C0C", fontSize: "0.82rem", textDecoration: "none", fontWeight: 600,
+                display: "inline-flex", alignItems: "center", gap: 4,
+              }}>
+                <i className="fas fa-external-link-alt"></i> Rate on Google
+              </a>
+              <b style={{ color: "#7A5030", fontSize: "0.82rem" }}>   |   </b>
+              <a href="#" target="_blank" rel="noopener noreferrer" style={{
+                color: "#7A0C0C", fontSize: "0.82rem", textDecoration: "none", fontWeight: 600,
+                display: "inline-flex", alignItems: "center", gap: 4,
+              }}>
+                <i className="fas fa-external-link-alt"></i> Rate on Zomato
+              </a>
+            </div>
+          </div>
 
-        <div
-          style={{ maxWidth: 700, margin: "48px auto 0", position: "relative" }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          {HOME_REVIEWS.map((r, idx) => (
-            <div key={idx} className={`review-card${idx === current ? " active" : ""}`}>
-              <p className="review-text">&ldquo;{r.text}&rdquo;</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div>
-                  <div className="reviewer-name">{r.name}</div>
-                  <div className="reviewer-location"><i className="fas fa-map-marker-alt" style={{ marginRight: 4 }}></i>{r.location}</div>
-                  <div style={{ color: "#C46A2E", fontSize: "0.8rem", marginTop: 4 }}>
+          {/* Review Cards - Right */}
+          <div
+            style={{ position: "relative" }}
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+          >
+            {HOME_REVIEWS.map((r, idx) => (
+              <div key={idx} className={`review-card${idx === current ? " active" : ""}`}>
+                <p className="review-text">&ldquo;{r.text}&rdquo;</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <div className="reviewer-name">{r.name}</div>
+                    <div className="reviewer-location">
+                      <i className="fas fa-map-marker-alt" style={{ marginRight: 4 }}></i>{r.location}
+                    </div>
+                  </div>
+                  <div className="star-display" style={{ color: "#C46A2E" }}>
                     {"⭐".repeat(r.stars)}
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 24 }}>
-            <button
-              onClick={prev}
-              style={{
-                background: "var(--dark-red)", color: "var(--mustard)", border: "none",
-                padding: "8px 18px", borderRadius: 4, fontWeight: 700, cursor: "pointer", fontSize: "0.82rem",
-              }}
-              aria-label="Previous review"
-            >
-              <i className="fas fa-arrow-left"></i>
-            </button>
-            <button
-              id="nextReview"
-              onClick={next}
-              style={{
-                background: "var(--dark-red)", color: "var(--mustard)", border: "none",
-                padding: "8px 18px", borderRadius: 4, fontWeight: 700, cursor: "pointer", fontSize: "0.82rem",
-              }}
-              aria-label="Next review"
-            >
-              <i className="fas fa-arrow-right"></i>
-            </button>
+            <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "center" }}>
+              <button onClick={prev} className="btn-sm-red" aria-label="Previous review">
+                <i className="fas fa-arrow-left"></i> Prev
+              </button>
+              <button onClick={next} className="btn-sm-red" aria-label="Next review">
+                Next <i className="fas fa-arrow-right"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>

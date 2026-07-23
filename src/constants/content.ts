@@ -1,4 +1,4 @@
-import type { Testimonial, Branch, JobListing, CareerPerk, TimelineEntry, PopupQuestion, FeatureCard, DishCard, MenuCategory, Review } from "@/types";
+import type { Testimonial, Branch, JobListing, CareerPerk, TimelineEntry, PopupQuestion, FeatureCard, MenuCategory, Review, HomeMenuTab } from "@/types";
 export { SITE_CONFIG } from "@/constants/site";
 
 export const HERO_CONTENT = {
@@ -14,30 +14,82 @@ export const HERO_CONTENT = {
 } as const;
 
 export const WHY_CHOOSE_FEATURES: FeatureCard[] = [
-  { icon: "🫕", title: "Traditional Handi Cooking", description: "Clay handis, slow flame, whole spices. No pressure cookers, no shortcuts. The old way is the right way." },
-  { icon: "⚔️", title: "Army-Born Discipline", description: "Founded by Army men — their discipline and honour flow through everything we do, from ingredient selection to service." },
-  { icon: "🌶️", title: "Pure Ingredients", description: "Fresh meat sourced daily. Pure mustard oil. No artificial colours or preservatives. What you taste is real." },
-  { icon: "🏡", title: "Bihar Pride", description: "Representing the rich food culture of Bihar with every plate — we're not just a restaurant, we're Bihar's culinary ambassadors." },
+  { icon: "🫕", title: "Real Handi Mutton", description: "Slow-cooked in clay handis using traditional spices handed down through generations – no shortcuts, ever." },
+  { icon: "📅", title: "Since 1985 Legacy", description: "Nearly four decades of feeding Bihar's bravest. Founded by Army Man Ram Sakal Singh with pride." },
+  { icon: "🌶️", title: "Authentic Spices", description: "Whole spices, mustard oil, fresh masalas – no artificial flavours, no shortcuts. Pure Bihari cooking." },
+  { icon: "❤️", title: "Trusted for Decades", description: "Thousands of loyal customers across Patna trust us every day. Loved by locals, recommended by food lovers." },
 ];
 
-export const HOME_DISH_CARDS: DishCard[] = [
-  { name: "Mutton Handi", description: "Slow-cooked in clay handi with traditional whole spices", price: "₹1100/kg", badge: "Bestseller", image: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&q=80&fm=webp" },
-  { name: "Chicken Handi", description: "Tender chicken in rich handi gravy with mustard oil", price: "₹800/kg", badge: "Popular", image: "https://images.unsplash.com/photo-1606491956689-2ea866880049?w=400&q=80&fm=webp" },
-  { name: "Fish Curry", description: "Fresh fish in spicy Bihar-style curry", price: "₹350/plate", badge: "Special", image: "https://images.unsplash.com/photo-1626508035297-0cd52b3b1e47?w=400&q=80&fm=webp" },
-  { name: "Mutton Thali", description: "Complete meal with mutton, rice, fulka, salad", price: "₹350/plate", badge: "Value", image: "https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=400&q=80&fm=webp" },
+export const HOME_MENU_TABS: HomeMenuTab[] = [
+  {
+    id: "special",
+    label: "🍲 Special",
+    dishes: [
+      { name: "Mutton Handi", description: "Slow-cooked tender mutton in rich masala gravy.", price: "₹ 1,200", quantity: "per kg", badge: "Chef's Pick", image: "https://images.unsplash.com/photo-1603360946369-dc9bb6258143?w=400&q=75&fm=webp" },
+      { name: "Ishtu Mutton", description: "A unique Bihari-style mutton stew with whole spices.", price: "₹ 420", quantity: "per plate (6 pcs)", badge: "Special", image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&q=75&fm=webp" },
+      { name: "Chicken Handi", description: "Tender chicken in creamy handi-style masala.", price: "₹ 700", quantity: "per kg", image: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=400&q=75&fm=webp" },
+      { name: "Fish Curry", description: "Fresh fish in spicy traditional Bihar gravy.", price: "₹ 420", quantity: "per plate (6 pcs)", image: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&q=75&fm=webp" },
+    ],
+  },
+  {
+    id: "thali",
+    label: "🍽 Thali",
+    dishes: [
+      { name: "Handi Mutton Thali", description: "200g handi mutton + unlimited roti + unlimited rice + salad + pickle", price: "₹ 300", badge: null },
+      { name: "Isto Mutton Thali", description: "3 pieces isto mutton + unlimited roti + unlimited rice + salad", price: "₹ 270", badge: null },
+      { name: "Handi Chicken Thali", description: "200g handi chicken + unlimited roti + unlimited rice + salad + pickle", price: "₹ 200", badge: "Best Value" },
+      { name: "Fish Curry Thali", description: "3 pieces fish curry + unlimited roti + unlimited rice + salad + pickle", price: "₹ 270", badge: null },
+    ],
+  },
+  {
+    id: "bread",
+    label: "🫓 Bread & Rice",
+    dishes: [
+      { name: "Fulka (Roti)", description: "Soft whole wheat fulka, made fresh on tawa.", price: "₹ 10", quantity: "per piece" },
+      { name: "Steamed Rice", description: "Plain hot steamed rice – perfect with any curry.", price: "₹ 60", quantity: "per plate" },
+    ],
+  },
+  {
+    id: "tandoori",
+    label: "🔥 Tandoori",
+    dishes: [
+      { name: "Chicken Tikka", description: "Marinated chicken roasted in tandoor to perfection.", price: "₹ 150", quantity: "per stick", badge: "🔥 Hot" },
+    ],
+  },
 ];
 
 export const HOME_REVIEWS: Review[] = [
-  { name: "Rahul Verma", location: "Danapur, Patna", text: "The mutton handi here is unlike anything I've had in Patna. Slow-cooked to perfection, the gravy soaks into every piece. Came here on a friend's recommendation and now I'm a weekly regular.", stars: 5 },
-  { name: "Priya Sinha", location: "Saguna, Patna", text: "Been eating here since 2010. This is the real deal — no shortcuts, no artificial stuff. The handi mutton reminds me of my nana's cooking. Three generations of my family visit this hotel.", stars: 5 },
-  { name: "Amit Kumar", location: "Patna City", text: "The fish curry here hits different. Place has a rustic feel, staff is friendly, and the portions are very generous. Highly recommended for non-veg lovers!", stars: 4 },
+  { name: "Rahul Verma", location: "Danapur, Patna", text: "The mutton handi here is unlike anything I've had in Patna. Slow-cooked to perfection, the gravy soaks right into every piece. Came here on a friend's recommendation and now I'm a regular. The fulka is buttery soft. Absolutely worth every rupee!", stars: 5 },
+  { name: "Priya Sinha", location: "Saguna, Patna", text: "Been eating here since 2010. This is the real deal – no shortcuts, no artificial stuff. The handi mutton reminds me of my nana's cooking. 3 generations of my family visit this hotel. The owner Alok bhai is very warm too. Keep it up!", stars: 5 },
+  { name: "Amit Kumar", location: "Patna City", text: "The fish curry here hits different. Came specifically after seeing it on Zomato. Place has a rustic feel, staff is friendly, and portions are very generous. The istu mutton was a revelation – never had anything like it before. Highly recommend!", stars: 4 },
+  { name: "Deepak Sharma", location: "New Delhi", text: "Visited from Delhi specially to eat here after my cousin wouldn't stop talking about it. Worth every bit of hype! The mutton handi thali is a complete experience – rich, bold flavours cooked the traditional Bihar way. I'll be back every time I'm in Patna.", stars: 5 },
 ];
 
 export const BRANCHES: Branch[] = [
-  { name: "Main Branch – Danapur", address: "Saguna Khagaul Road, Kaliket Nagar, Danapur, Patna – 801105", mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d85.04013837453462!3d25.605789115031605!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39ed57a4587f033f%3A0xba50f4f58760036c!2sDadan%20Handi%20Mutton!5e0!3m2!1sen!2sin!4v1775750002323!5m2!1sen!2sin", mapsLink: "https://maps.google.com/?q=dadan+handi+mutton+hotel+Saguna+Khagaul+Road+Kaliket+Nagar+Danapur+Patna" },
-  { name: "Branch 2 – Khajpura", address: "Near Khajpura Crossing, Patna – 801105", mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d85.04013837453462!3d25.605789115031605!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39ed57a4587f033f%3A0xba50f4f58760036c!2sDadan%20Handi%20Mutton!5e0!3m2!1sen!2sin!4v1775750002323!5m2!1sen!2sin", mapsLink: "https://maps.google.com/?q=dadan+handi+khajpura+patna" },
-  { name: "Branch 3 – Adalatganj", address: "Near Court, Adalatganj, Patna – 800001", mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d85.04013837453462!3d25.605789115031605!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39ed57a4587f033f%3A0xba50f4f58760036c!2sDadan%20Handi%20Mutton!5e0!3m2!1sen!2sin!4v1775750002323!5m2!1sen!2sin", mapsLink: "https://maps.google.com/?q=dadan+handi+adalatganj+patna" },
-  { name: "Branch 4 – Boring Road", address: "Boring Road, Near Boring Road Crossing, Patna", mapEmbed: "", mapsLink: "", comingSoon: true },
+  { 
+    name: "Danapur Branch", 
+    address: "Saguna Khagaul Road, Kaliket Nagar, Danapur, Patna, Bihar",
+    mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d85.04013837453462!3d25.605789115031605!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39ed57a4587f033f%3A0xba50f4f58760036c!2sDadan%20Handi%20Mutton!5e0!3m2!1sen!2sin!4v1775750002323!5m2!1sen!2sin", 
+    mapsLink: "https://maps.google.com/?q=dadan+handi+mutton+hotel+Patna" 
+  },
+  { 
+    name: "Gola Road Branch", 
+    address: "Gola Road, Danapur, Patna, Bihar",
+    mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d85.053453!3d25.613161!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1sDadan%20Handi%20Mutton%20Hotel%2C%20Gola%20Road!5e0!3m2!1sen!2sin", 
+    mapsLink: "https://maps.google.com/?q=dadan+handi+mutton+hotel+Patna" 
+  },
+  { 
+    name: "Rajeev Nagar Branch", 
+    address: "Nepali More, Rajeev Nagar, Ashiana more, Bailey Road, Patna, Bihar",
+    mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d85.080809!3d25.622750!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1sDadan%20Handi%20Mutton%20Hotel%2C%20Bailey%20Road!5e0!3m2!1sen!2sin", 
+    mapsLink: "https://maps.google.com/?q=dadan+handi+mutton+hotel+Patna" 
+  },
+  { 
+    name: "Arrah Branch", 
+    address: "S Bhelai Rd, Sarvodaya Nagar, Jagdev Nagar, Arrah, Bihar",
+    mapEmbed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.9737316215424!2d84.644520!3d25.534535!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1sDadan%20Handi%20Mutton%20Hotel%2C%20Arrah!5e0!3m2!1sen!2sin", 
+    mapsLink: "https://maps.google.com/?q=dadan+handi+mutton+hotel+arrah" 
+  },
 ];
 
 export const TESTIMONIALS: Testimonial[] = [
@@ -192,15 +244,16 @@ export const POPUP_QUESTIONS: PopupQuestion[] = [
 ];
 
 export const ABOUT_STATS = [
-  { value: "1985", label: "Founded" },
-  { value: "3", label: "Generations" },
-  { value: "4", label: "Branches" },
-  { value: "10k+", label: "Customers" },
+  { value: "39+", label: "YEARS LEGACY" },
+  { value: "4", label: "BRANCHES" },
+  { value: "⭐ 3.7", label: "GENUINE RATING" },
+  { value: "10,000+", label: "HAPPY CUSTOMERS" },
 ];
 
 export const RATING_SUMMARY = {
   overall: "3.7",
   stars: "⭐⭐⭐⭐",
+  subtitle: "Based on Zomato & Google Reviews",
   breakdown: [
     { stars: 5, percentage: 42 },
     { stars: 4, percentage: 28 },

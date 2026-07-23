@@ -25,9 +25,9 @@ export default function HeroSection() {
     }
   }, []);
 
-  // Create smoke particles
+  // Create smoke particles (matching live site JS behavior)
   const smokeParticles = Array.from({ length: 6 }, (_, i) => {
-    const sz = Math.random() * 100 + 50;
+    const sz = Math.random() * 55 + 88;
     const lft = Math.random() * 100;
     const dur = Math.random() * 12 + 10;
     const del = Math.random() * 8;
@@ -38,6 +38,14 @@ export default function HeroSection() {
     <section className="hero-section">
       <div ref={heroBgRef} className="hero-bg"></div>
       <div className="smoke-overlay"></div>
+
+      <div className="steam-wrap" aria-hidden="true">
+        <div className="steam-wisp"></div>
+        <div className="steam-wisp"></div>
+        <div className="steam-wisp"></div>
+        <div className="steam-wisp"></div>
+        <div className="steam-wisp"></div>
+      </div>
 
       {smokeParticles.map((p) => (
         <div
@@ -53,40 +61,32 @@ export default function HeroSection() {
         />
       ))}
 
-      <div className="steam-wrap">
-        <div className="steam-wisp"></div>
-        <div className="steam-wisp"></div>
-        <div className="steam-wisp"></div>
-        <div className="steam-wisp"></div>
-        <div className="steam-wisp"></div>
-      </div>
-
       <div className="hero-content">
-        <div className="hero-since">{HERO_CONTENT.since}</div>
-        <h1 className="hero-title-hindi">
-          {HERO_CONTENT.titleHindi} <span>{HERO_CONTENT.titleHighlight}</span>
+        <div className="hero-since">⚔ Since 1985 · Bihar&apos;s Finest Handi ⚔</div>
+        <h1 className="hero-title-hindi" style={{ fontSize: "clamp(2.6rem, 7.5vw, 5.5rem)" }}>
+          <b>ददन हांडी</b> <span><b>मटन</b></span>
         </h1>
         <div className="hero-divider"></div>
-        <p className="hero-tagline-hindi">
+        <div className="hero-tagline-hindi">
           {HERO_CONTENT.tagline1}
           <span>{HERO_CONTENT.tagline2}</span>
-        </p>
-        <p className="hero-subtitle">{HERO_CONTENT.subtitle}</p>
+        </div>
+        <p className="hero-subtitle">Authentic Bihar · Handi Specialist · Danapur, Patna</p>
 
-        <div className="hero-btns-wrap" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14, marginTop: 8 }}>
           <Link href={HERO_CONTENT.cta1.href} className="btn-hero-primary">
-            <i className={HERO_CONTENT.cta1.icon}></i> {HERO_CONTENT.cta1.label}
+            <i className="fas fa-utensils"></i> Order on Zomato
           </Link>
           <a href={HERO_CONTENT.cta2.href} target="_blank" rel="noopener noreferrer" className="btn-hero-whatsapp">
-            <i className={HERO_CONTENT.cta2.icon}></i> {HERO_CONTENT.cta2.label}
+            <i className="fab fa-whatsapp"></i> WhatsApp Chat
           </a>
-          <Link href={HERO_CONTENT.cta3.href} className="btn-hero-secondary">
-            <i className={HERO_CONTENT.cta3.icon}></i> {HERO_CONTENT.cta3.label}
-          </Link>
+          <a href="tel:8986496574" className="btn-hero-secondary">
+            <i className="fas fa-phone"></i> Call Now
+          </a>
         </div>
       </div>
 
-      <div className="hero-scroll-indicator">
+      <div className="hero-scroll-indicator" aria-hidden="true">
         <i className="fas fa-chevron-down"></i>
       </div>
     </section>

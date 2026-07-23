@@ -48,8 +48,12 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
         <link rel="preload" as="image" href="/images/hero-handi.webp" type="image/webp" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Hindi:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className={`${playfair.variable} ${nunito.variable} bg-[#FDF3E3] text-[#4A2010]`}>
+        <style>{`body { --font-tiro: 'Tiro Devanagari Hindi', serif; }`}</style>
         {children}
       </body>
     </html>

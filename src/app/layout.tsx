@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Nunito } from "next/font/google";
+import ClientProviders from "@/components/auth/ClientProviders";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -54,7 +55,7 @@ export default function RootLayout({
       </head>
       <body className={`${playfair.variable} ${nunito.variable} bg-[#FDF3E3] text-[#4A2010]`}>
         <style>{`body { --font-tiro: 'Tiro Devanagari Hindi', serif; }`}</style>
-        {children}
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );

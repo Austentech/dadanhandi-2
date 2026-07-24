@@ -4,12 +4,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_LINKS, SITE_CONFIG } from "@/constants/site";
+import { useAuth } from "@/hooks/use-auth";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const mobileOpenRef = useRef(false);
+  const { isAuthenticated, isLoading, profile } = useAuth();
+  const { openAuthModal, openUserDrawer } = useAuthContext();
 
   const closeMobile = useCallback(() => {
     mobileOpenRef.current = false;
@@ -22,7 +26,6 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close mobile nav on route change — standard Next.js pattern
   useEffect(() => {
     if (mobileOpenRef.current) {
       mobileOpenRef.current = false;
@@ -37,6 +40,8 @@ export default function Navbar() {
     setMobileOpen(next);
   }, []);
 
+  const firstName = profile?.full_name?.split(" ")[0] || null;
+
   return (
     <nav className="navbar" style={scrolled ? { boxShadow: "0 2px 24px rgba(122,12,12,0.25)" } : undefined}>
       <div className="container-custom">
@@ -49,7 +54,7 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <ul className="navbar-nav" style={{ display: "flex" }}>
+          <ul className="navbar-nav" style={{ display: "flex", alignItems: "center" }}>
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <Link
@@ -60,6 +65,30 @@ export default function Navbar() {
                 </Link>
               </li>
             ))}
+            {/* Auth button or user greeting */}
+            <li>
+              {isLoading ? (
+                <span className="nav-auth-btn" style={{ opacity: 0.6 }}>...</span>
+              ) : isAuthenticated && firstName ? (
+                <button
+                  className="nav-user-btn"
+                  onClick={openUserDrawer}
+                  aria-label="Open user menu"
+                >
+                  <span className="nav-user-icon">
+                    <i className="fas fa-user"></i>
+                  </span>
+                  <span className="nav-user-name">Hello, {firstName}</span>
+                </button>
+              ) : (
+                <button
+                  className="nav-login-btn"
+                  onClick={() => openAuthModal("login")}
+                >
+                  <i className="fas fa-user" style={{ marginRight: 6 }}></i> Login
+                </button>
+              )}
+            </li>
           </ul>
 
           <button className="navbar-toggler" onClick={toggleMobile} aria-label="Toggle navigation">
@@ -89,10 +118,39 @@ export default function Navbar() {
             {link.label}
           </Link>
         ))}
+        {/* Mobile auth button */}
         <div style={{ marginTop: 24, padding: "12px 16px", borderTop: "1px solid rgba(122,12,12,0.15)" }}>
-          <a href={SITE_CONFIG.whatsappOrderLink} target="_blank" rel="noopener noreferrer" style={{ color: "#25D366", fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="fab fa-whatsapp"></i> Order on WhatsApp
-          </a>
+          {isAuthenticated && firstName ? (
+            <button
+              className="nav-user-btn"
+              onClick={() => {
+                toggleMobile()
+                openUserDrawer()
+              }}
+              style={{ width: "100%", justifyContent: "center", padding: "10px 16px" }}
+            >
+              <span className="nav-user-icon">
+                <i className="fas fa-user"></i>
+              </span>
+              <span className="nav-user-name">Hello, {firstName}</span>
+            </button>
+          ) : (
+            <>
+              <button
+                className="nav-login-btn"
+                onClick={() => {
+                  toggleMobile()
+                  openAuthModal("login")
+                }}
+                style={{ width: "100%", justifyContent: "center", padding: "10px 16px", marginBottom: 12 }}
+              >
+                <i className="fas fa-user" style={{ marginRight: 6 }}></i> Login
+              </button>
+              <a href={SITE_CONFIG.whatsappOrderLink} target="_blank" rel="noopener noreferrer" style={{ color: "#25D366", fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
+                <i className="fab fa-whatsapp"></i> Order on WhatsApp
+              </a>
+            </>
+          )}
         </div>
       </div>
     </nav>

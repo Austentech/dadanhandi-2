@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SITE_CONFIG, NAV_LINKS, FOOTER_MENU_LINKS, SOCIAL_LINKS } from "@/constants/site";
+import { SITE_CONFIG, FOOTER_NAV_LINKS, FOOTER_MENU_LINKS, SOCIAL_LINKS } from "@/constants/site";
 
 export default function Footer() {
   return (
@@ -26,7 +26,7 @@ export default function Footer() {
           <div>
             <h6>Quick Links</h6>
             <ul className="footer-links">
-              {NAV_LINKS.map((link) => (
+              {FOOTER_NAV_LINKS.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href}>{link.label}</Link>
                 </li>

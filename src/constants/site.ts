@@ -28,6 +28,14 @@ export const NAV_LINKS = [
   { label: "About", href: "/about" },
   { label: "Menu", href: "/menu" },
   { label: "Reviews", href: "/reviews" },
+  { label: "Contact", href: "/contact" },
+] as const;
+
+export const FOOTER_NAV_LINKS = [
+  { label: "Home", href: "/" },
+  { label: "About", href: "/about" },
+  { label: "Menu", href: "/menu" },
+  { label: "Reviews", href: "/reviews" },
   { label: "Blog", href: "/blog" },
   { label: "Careers", href: "/careers" },
   { label: "Contact", href: "/contact" },

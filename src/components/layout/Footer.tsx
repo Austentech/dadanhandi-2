@@ -26,7 +26,7 @@ export default function Footer() {
           <div>
             <h6>Quick Links</h6>
             <ul className="footer-links">
-              {NAV_LINKS.slice(0, 5).map((link) => (
+              {NAV_LINKS.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href}>{link.label}</Link>
                 </li>

@@ -94,7 +94,7 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
   })
 
   const handleSendOTP = useCallback(
-    async (email: string) => {
+    async (email: string, isResend = false) => {
       setLoading(true)
       setMessage(null)
 
@@ -102,7 +102,7 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
         const response = await fetch('/api/auth/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, resend: isResend }),
         })
 
         const data = await response.json()
@@ -194,7 +194,7 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
 
   const handleResendOTP = useCallback(async () => {
     if (!state.email || countdown > 0) return
-    await handleSendOTP(state.email)
+    await handleSendOTP(state.email, true)
   }, [state.email, countdown, handleSendOTP])
 
   const handleGoogleLogin = useCallback(() => {

@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/client-server'
 import { checkDualRateLimit } from '@/lib/security/rate-limiter'
 import { emailSchema } from '@/lib/validation/schemas'
+import { getProfileByEmail } from '@/services/profile-service'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { email } = body as { email: string }
+    const { email, resend } = body as { email: string; resend?: boolean }
 
+    // 1. Validate email format
     const emailResult = emailSchema.safeParse(email)
     if (!emailResult.success) {
       return NextResponse.json(
@@ -16,7 +18,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Rate limiting
+    // 2. Rate limiting
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip') || 'unknown'
 
@@ -34,25 +36,58 @@ export async function POST(request: Request) {
       )
     }
 
+    // 3. Check if user exists — skip this check for resend (user already verified)
+    if (!resend) {
+      const profile = await getProfileByEmail(email)
+      if (!profile) {
+        return NextResponse.json(
+          { success: false, message: 'No account found with this email. Please create an account first.' },
+          { status: 404 }
+        )
+      }
+
+      // If user signed up via Google, they can't login with OTP
+      if (profile.provider === 'google') {
+        return NextResponse.json(
+          { success: false, message: 'This email is registered with Google. Please click "Continue with Google" to login.' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // 4. Send OTP to existing user (never create a new user during login)
     const supabase = await createServerClient()
+    const normalizedEmail = email.toLowerCase()
 
     const { error } = await supabase.auth.signInWithOtp({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auth/callback`,
+        shouldCreateUser: false,
       },
     })
 
     if (error) {
+      const msg = (error.message || '').toLowerCase()
+
+      if (msg.includes('user not found') || msg.includes('not found')) {
+        return NextResponse.json(
+          { success: false, message: 'No account found with this email. Please create an account first.' },
+          { status: 404 }
+        )
+      }
+
       return NextResponse.json(
         { success: false, message: 'Unable to send OTP. Please try again later.' },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ success: true, message: 'OTP sent successfully.' })
-  } catch {
+    return NextResponse.json({
+      success: true,
+      message: 'OTP sent successfully! Check your email.',
+    })
+  } catch (err) {
+    console.error('[SEND-OTP ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }

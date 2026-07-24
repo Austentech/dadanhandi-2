@@ -34,20 +34,26 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = await createServerClient()
-
+    // Check if profile already exists (means user already registered)
     const existingProfile = await getProfileByEmail(body.email)
     if (existingProfile) {
       return NextResponse.json(
-        { success: false, message: 'This email is already registered. Please log in.' },
+        { success: false, message: 'This email is already registered. Please log in instead.' },
         { status: 409 }
       )
     }
 
-    // Sign up user with a random password (they use OTP, not password)
+    const supabase = await createServerClient()
+    const normalizedEmail = body.email.toLowerCase()
+
+    // Random password (user authenticates via OTP, not password)
+    const randomPassword = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+
+    // Try to sign up — if user already exists in auth.users (from signInWithOtp),
+    // signUp will return an error. We handle that gracefully.
     const { data, error } = await supabase.auth.signUp({
-      email: body.email.toLowerCase(),
-      password: crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, ''),
+      email: normalizedEmail,
+      password: randomPassword,
       options: {
         data: {
           full_name: body.full_name,
@@ -61,37 +67,62 @@ export async function POST(request: Request) {
       },
     })
 
+    // Handle "user already exists" error gracefully
     if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('already registered') || msg.includes('already been registered') ||
+          msg.includes('already in use') || msg.includes('user already exists') ||
+          msg.includes('identity already exists')) {
+        return NextResponse.json(
+          { success: false, message: 'This email is already registered. Please log in instead.' },
+          { status: 409 }
+        )
+      }
       return NextResponse.json(
         { success: false, message: 'Registration failed. Please try again.' },
         { status: 500 }
       )
     }
 
-    // Create profile record
+    // Profile is auto-created by the database trigger (handle_new_user)
+    // which reads all fields from user_metadata (whatsapp, area, city, pincode)
+    // As a safety net, also upsert via RPC
     if (data.user) {
-      await createProfile({
-        auth_user_id: data.user.id,
-        email: body.email.toLowerCase(),
-        full_name: body.full_name,
-        whatsapp_number: body.whatsapp_number,
-        mobile_number: body.mobile_number || null,
-        area: body.area,
-        city: body.city,
-        pincode: body.pincode,
-        provider: 'email',
-        profile_completed: true,
+      try {
+        await createProfile({
+          auth_user_id: data.user.id,
+          email: normalizedEmail,
+          full_name: body.full_name,
+          whatsapp_number: body.whatsapp_number,
+          mobile_number: body.mobile_number || null,
+          area: body.area,
+          city: body.city,
+          pincode: body.pincode,
+          provider: 'email',
+          profile_completed: true,
+        })
+      } catch {
+        // Trigger should have created the profile — this is just a safety net
+      }
+
+      // Send OTP email for the user to verify
+      await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: {
+          shouldCreateUser: false,
+        },
       })
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Registration successful! Please verify your email with the OTP sent.',
-      data: { email: body.email },
+      message: 'Registration successful! Please check your email for the OTP code.',
+      data: { email: normalizedEmail },
     })
-  } catch {
+  } catch (err) {
+    console.error('[REGISTER ERROR]', err)
     return NextResponse.json(
-      { success: false, message: 'Something went wrong during registration.' },
+      { success: false, message: 'Something went wrong during registration. Please try again.' },
       { status: 500 }
     )
   }

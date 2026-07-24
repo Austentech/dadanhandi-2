@@ -9,6 +9,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { email, otp } = body as { email: string; otp: string }
 
+    // Validate email
     const emailResult = emailSchema.safeParse(email)
     if (!emailResult.success) {
       return NextResponse.json(
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
       )
     }
 
+    // Validate OTP (must be exactly 6 digits)
     const otpResult = otpSchema.safeParse(otp)
     if (!otpResult.success) {
       return NextResponse.json(
@@ -25,6 +27,7 @@ export async function POST(request: Request) {
       )
     }
 
+    // Rate limiting
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip') || 'unknown'
 
@@ -44,6 +47,7 @@ export async function POST(request: Request) {
 
     const supabase = await createServerClient()
 
+    // Verify the OTP code
     const { data, error } = await supabase.auth.verifyOtp({
       email: email.toLowerCase(),
       token: otp,
@@ -51,29 +55,52 @@ export async function POST(request: Request) {
     })
 
     if (error) {
+      const errorMsg = error.message || ''
+
+      // Provide specific guidance based on error type
+      if (errorMsg.includes('OTP is expired') || errorMsg.includes('expired')) {
+        return NextResponse.json(
+          { success: false, message: 'OTP has expired. Please request a new one.' },
+          { status: 401 }
+        )
+      }
+
+      if (errorMsg.includes('Token has been used') || errorMsg.includes('already verified')) {
+        return NextResponse.json(
+          { success: false, message: 'This OTP has already been used. Please request a new one.' },
+          { status: 401 }
+        )
+      }
+
       return NextResponse.json(
-        { success: false, message: 'Invalid or expired OTP. Please try again.' },
+        { success: false, message: 'Invalid or expired OTP. Please check your email and try again.' },
         { status: 401 }
       )
     }
 
-    // Reset rate limits on success
+    // Reset rate limits on successful verification
     resetRateLimit(ip, 'otp_request')
     resetRateLimit(email, 'otp_request')
     resetRateLimit(ip, 'auth_attempt')
     resetRateLimit(email, 'auth_attempt')
 
-    // Ensure profile exists
+    // Ensure profile exists (trigger should handle this, but use RPC as safety net)
     if (data.user) {
-      const existingProfile = await getProfileByEmail(email)
-      if (!existingProfile) {
-        await createProfile({
-          auth_user_id: data.user.id,
-          email: email.toLowerCase(),
-          full_name: data.user.user_metadata?.full_name || '',
-          provider: 'email',
-          profile_completed: true,
-        })
+      try {
+        const existingProfile = await getProfileByEmail(email)
+        if (!existingProfile) {
+          // Profile doesn't exist yet — create it via RPC (bypasses RLS)
+          await createProfile({
+            auth_user_id: data.user.id,
+            email: email.toLowerCase(),
+            full_name: data.user.user_metadata?.full_name || '',
+            provider: 'email',
+            profile_completed: true,
+          })
+        }
+      } catch {
+        // Profile creation failed — non-fatal, trigger should handle it
+        console.error('[VERIFY-OTP] Profile creation safety net failed, trigger should have created it')
       }
     }
 
@@ -82,7 +109,8 @@ export async function POST(request: Request) {
       message: 'Login successful!',
       data: { redirectTo: '/' },
     })
-  } catch {
+  } catch (err) {
+    console.error('[VERIFY-OTP ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }

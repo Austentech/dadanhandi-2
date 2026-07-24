@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       )
     }
 
+    // updateProfile now uses RPC (SECURITY DEFINER) which bypasses RLS
     await updateProfile(user.id, {
       whatsapp_number: body.whatsapp_number,
       area: body.area,
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true, message: 'Profile completed successfully!' })
-  } catch {
+  } catch (err) {
+    console.error('[COMPLETE-PROFILE ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }

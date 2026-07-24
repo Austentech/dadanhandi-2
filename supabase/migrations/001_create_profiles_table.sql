@@ -1,7 +1,7 @@
 -- ============================================================
 -- Dadan Handi Mutton Hotel - Database Migration
--- Profiles Table + RLS Policies
--- Run this in Supabase SQL Editor
+-- Profiles Table + RLS Policies + Auto-create Trigger
+-- Run this in Supabase Dashboard > SQL Editor
 -- ============================================================
 
 -- 1. Create profiles table
@@ -111,3 +111,7 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
+
+-- 11. Grant access to authenticated users
+GRANT SELECT, INSERT, UPDATE ON public.profiles TO authenticated;
+GRANT USAGE ON SCHEMA public TO authenticated;

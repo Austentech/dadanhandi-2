@@ -82,3 +82,31 @@ Stage Summary:
 - Profile auto-creation enhanced: trigger reads whatsapp, area, city, pincode from user_metadata
 - User must run migration 002 in Supabase SQL Editor AND update email template to use {{ .Token }}
 - All API routes now work correctly even without user session context
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Major refactor - replace OTP auth with password-based auth + forgot password flow
+
+Work Log:
+- Removed OTP-based login/registration entirely
+- Updated validation schemas: added passwordSchema (8+ chars, uppercase, lowercase, number, special char), loginSchema, forgotPasswordSchema, resetPasswordSchema
+- Updated registerSchema to include password + confirm_password with .refine() match check
+- Updated AuthModalState views: 'login' | 'register' | 'forgot' | 'forgot-success' (removed 'otp')
+- Created /api/auth/login/route.ts: email + password login via signInWithPassword, rate limited, sanitized
+- Refactored /api/auth/register/route.ts: password-based signup via Supabase signUp (bcrypt auto-hash), sanitized inputs, no OTP
+- Created /api/auth/forgot-password/route.ts: validates user exists, sends recovery email via resetPasswordForEmail, prevents email enumeration
+- Created /api/auth/reset-password/route.ts: updates password via updateUser, auto-signout after reset, sanitized
+- Updated /api/auth/callback/route.ts: handles recovery redirect to /reset-password page
+- Created /reset-password page with Suspense boundary + ResetPasswordForm component
+- Complete AuthModal refactor: removed OTP view, added password fields with show/hide toggle, forgot password flow, success state with email icon
+- Deprecated old OTP routes (send-otp, verify-otp, resend-otp) with 410 responses
+- Added CSS support: password visibility toggle buttons in modal and reset page
+- Build verified: zero errors, 22 routes
+
+Stage Summary:
+- Complete password auth system: login (email+password), register (all fields+password), forgot password (recovery link flow), reset password
+- Password security: bcrypt auto-hash by Supabase, strong password requirements (Zod validation)
+- Input sanitization: all text inputs sanitized via sanitizeString(), no XSS characters
+- Forgot password: email validation → recovery link via Supabase SMTP → dedicated reset page → updateUser
+- User MUST set "Confirm email" to OFF in Supabase Dashboard for immediate login after registration

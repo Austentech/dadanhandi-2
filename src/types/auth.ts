@@ -61,15 +61,9 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
-export interface OTPState {
-  email: string;
-  expiresAt: number;
-  attempts: number;
-}
-
 export interface AuthModalState {
   isOpen: boolean;
-  view: 'login' | 'register' | 'otp';
+  view: 'login' | 'register' | 'forgot' | 'forgot-success';
   email?: string;
   redirectTo?: string;
 }

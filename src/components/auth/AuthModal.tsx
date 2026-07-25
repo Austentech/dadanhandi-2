@@ -3,20 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import OTPInput from '@/components/auth/OTPInput'
 import { useAuth } from '@/hooks/use-auth'
-import { emailSchema, registerSchema } from '@/lib/validation/schemas'
+import { loginSchema, registerSchema, forgotPasswordSchema } from '@/lib/validation/schemas'
 import type { AuthModalState } from '@/types/auth'
-
-type FormData = {
-  email: string
-  full_name: string
-  whatsapp_number: string
-  mobile_number: string
-  area: string
-  city: string
-  pincode: string
-}
+import type { LoginFormData, RegisterFormData, ForgotPasswordFormData } from '@/lib/validation/schemas'
 
 interface AuthModalProps {
   state: AuthModalState
@@ -24,28 +14,19 @@ interface AuthModalProps {
   onViewChange: (view: AuthModalState['view'], email?: string) => void
 }
 
-const COUNTDOWN_SECONDS = 60
-
 export default function AuthModal({ state, onClose, onViewChange }: AuthModalProps) {
   const { signInWithGoogle } = useAuth()
-  const [otpValue, setOtpValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [countdown, setCountdown] = useState(0)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
-
-  // Countdown timer for resend
-  useEffect(() => {
-    if (countdown <= 0) return
-    const timer = setInterval(() => setCountdown((c) => c - 1), 1000)
-    return () => clearInterval(timer)
-  }, [countdown])
 
   // Reset state when view changes
   useEffect(() => {
-    setOtpValue('')
     setMessage(null)
-    setCountdown(0)
+    setShowPassword(false)
+    setShowConfirmPassword(false)
   }, [state.view])
 
   // ESC to close
@@ -71,46 +52,32 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
     [onClose]
   )
 
-  // Login form
-  const loginForm = useForm<{ email: string }>({
-    resolver: zodResolver(
-      registerSchema.pick({ email: true })
-    ),
-    defaultValues: { email: state.email || '' },
+  // ── LOGIN FORM ──
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
   })
 
-  // Register form
-  const registerForm = useForm<FormData>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      email: '',
-      full_name: '',
-      whatsapp_number: '',
-      mobile_number: '',
-      area: '',
-      city: '',
-      pincode: '',
-    },
-  })
-
-  const handleSendOTP = useCallback(
-    async (email: string, isResend = false) => {
+  const handleLoginSubmit = useCallback(
+    loginForm.handleSubmit(async (values) => {
       setLoading(true)
       setMessage(null)
 
       try {
-        const response = await fetch('/api/auth/send-otp', {
+        const response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, resend: isResend }),
+          body: JSON.stringify(values),
         })
 
         const data = await response.json()
 
         if (data.success) {
           setMessage({ type: 'success', text: data.message })
-          setCountdown(COUNTDOWN_SECONDS)
-          onViewChange('otp', email)
+          setTimeout(() => {
+            onClose()
+            window.location.href = data.data?.redirectTo || '/'
+          }, 600)
         } else {
           setMessage({ type: 'error', text: data.message })
         }
@@ -119,16 +86,25 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
       } finally {
         setLoading(false)
       }
-    },
-    [onViewChange]
+    }),
+    [loginForm, onClose]
   )
 
-  const handleLoginSubmit = useCallback(
-    loginForm.handleSubmit(async (values) => {
-      await handleSendOTP(values.email)
-    }),
-    [loginForm, handleSendOTP]
-  )
+  // ── REGISTER FORM ──
+  const registerForm = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      full_name: '',
+      email: '',
+      password: '',
+      confirm_password: '',
+      whatsapp_number: '',
+      mobile_number: '',
+      area: '',
+      city: '',
+      pincode: '',
+    },
+  })
 
   const handleRegisterSubmit = useCallback(
     registerForm.handleSubmit(async (values) => {
@@ -146,8 +122,8 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
 
         if (data.success) {
           setMessage({ type: 'success', text: data.message })
-          setCountdown(COUNTDOWN_SECONDS)
-          onViewChange('otp', values.email)
+          // Switch to login view after successful registration
+          setTimeout(() => onViewChange('login'), 1500)
         } else {
           setMessage({ type: 'error', text: data.message })
         }
@@ -160,49 +136,96 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
     [registerForm, onViewChange]
   )
 
-  const handleVerifyOTP = useCallback(async () => {
-    if (otpValue.length !== 6 || !state.email) return
+  // ── FORGOT PASSWORD FORM ──
+  const forgotForm = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: state.email || '' },
+  })
 
-    setLoading(true)
-    setMessage(null)
+  const handleForgotSubmit = useCallback(
+    forgotForm.handleSubmit(async (values) => {
+      setLoading(true)
+      setMessage(null)
 
-    try {
-      const response = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: state.email, otp: otpValue }),
-      })
+      try {
+        const response = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(values),
+        })
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (data.success) {
-        setMessage({ type: 'success', text: data.message })
-        // Wait a moment then close and redirect
-        setTimeout(() => {
-          onClose()
-          window.location.href = data.data?.redirectTo || '/'
-        }, 800)
-      } else {
-        setMessage({ type: 'error', text: data.message })
+        if (data.success) {
+          onViewChange('forgot-success')
+        } else {
+          setMessage({ type: 'error', text: data.message })
+        }
+      } catch {
+        setMessage({ type: 'error', text: 'Something went wrong. Please try again.' })
+      } finally {
+        setLoading(false)
       }
-    } catch {
-      setMessage({ type: 'error', text: 'Something went wrong. Please try again.' })
-    } finally {
-      setLoading(false)
-    }
-  }, [otpValue, state.email, onClose])
+    }),
+    [forgotForm, onViewChange]
+  )
 
-  const handleResendOTP = useCallback(async () => {
-    if (!state.email || countdown > 0) return
-    await handleSendOTP(state.email, true)
-  }, [state.email, countdown, handleSendOTP])
-
+  // ── GOOGLE LOGIN ──
   const handleGoogleLogin = useCallback(() => {
     signInWithGoogle()
     onClose()
   }, [signInWithGoogle, onClose])
 
   if (!state.isOpen) return null
+
+  // ── PASSWORD FIELD RENDERER ──
+  const renderPasswordField = (
+    id: string,
+    label: string,
+    placeholder: string,
+    registerFn: ReturnType<typeof useForm>['register'],
+    error: string | undefined,
+    show: boolean,
+    onToggle: () => void,
+    autoComplete: string,
+  ) => (
+    <div className="auth-field" style={{ position: 'relative' }}>
+      <label htmlFor={id} className="auth-label">{label}</label>
+      <div style={{ position: 'relative' }}>
+        <input
+          id={id}
+          type={show ? 'text' : 'password'}
+          className="auth-input"
+          style={{ paddingRight: 44 }}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          {...registerFn}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="auth-password-toggle"
+          tabIndex={-1}
+          aria-label={show ? 'Hide password' : 'Show password'}
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#7A5030',
+            fontSize: '1rem',
+            padding: 4,
+          }}
+        >
+          {show ? <i className="fas fa-eye-slash"></i> : <i className="fas fa-eye"></i>}
+        </button>
+      </div>
+      {error && <p className="auth-error">{error}</p>}
+    </div>
+  )
 
   return (
     <div
@@ -227,12 +250,14 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
           <h2 className="auth-modal-title">
             {state.view === 'login' && 'Welcome Back'}
             {state.view === 'register' && 'Create Account'}
-            {state.view === 'otp' && 'Verify Email'}
+            {state.view === 'forgot' && 'Forgot Password'}
+            {state.view === 'forgot-success' && 'Check Your Email'}
           </h2>
           <p className="auth-modal-subtitle">
-            {state.view === 'login' && 'Login with your email to continue'}
+            {state.view === 'login' && 'Sign in with your email and password'}
             {state.view === 'register' && 'Join us for the best handi experience'}
-            {state.view === 'otp' && `Enter the OTP sent to ${state.email}`}
+            {state.view === 'forgot' && 'Enter your email to get a reset link'}
+            {state.view === 'forgot-success' && 'We\'ve sent a password reset link to your email'}
           </p>
         </div>
 
@@ -243,7 +268,7 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
           </div>
         )}
 
-        {/* LOGIN VIEW */}
+        {/* ═══════════ LOGIN VIEW ═══════════ */}
         {state.view === 'login' && (
           <form onSubmit={handleLoginSubmit} noValidate>
             <div className="auth-field">
@@ -262,9 +287,31 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
               )}
             </div>
 
+            {renderPasswordField(
+              'login-password',
+              'Password',
+              'Enter your password',
+              loginForm.register('password'),
+              loginForm.formState.errors.password?.message,
+              showPassword,
+              () => setShowPassword((p) => !p),
+              'current-password',
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+              <button
+                type="button"
+                className="auth-link"
+                onClick={() => onViewChange('forgot')}
+                style={{ fontSize: '0.85rem' }}
+              >
+                Forgot Password?
+              </button>
+            </div>
+
             <button type="submit" className="auth-btn-primary" disabled={loading}>
               {loading ? <span className="auth-spinner"></span> : null}
-              {loading ? 'Sending OTP...' : 'Continue'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
 
             <div className="auth-divider">
@@ -290,7 +337,7 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
           </form>
         )}
 
-        {/* REGISTER VIEW */}
+        {/* ═══════════ REGISTER VIEW ═══════════ */}
         {state.view === 'register' && (
           <form onSubmit={handleRegisterSubmit} noValidate className="auth-register-form">
             <div className="auth-field">
@@ -323,6 +370,28 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
                 <p className="auth-error">{registerForm.formState.errors.email.message}</p>
               )}
             </div>
+
+            {renderPasswordField(
+              'reg-password',
+              'Password *',
+              'Min 8 chars with uppercase, number, special char',
+              registerForm.register('password'),
+              registerForm.formState.errors.password?.message,
+              showPassword,
+              () => setShowPassword((p) => !p),
+              'new-password',
+            )}
+
+            {renderPasswordField(
+              'reg-confirm',
+              'Confirm Password *',
+              'Re-enter your password',
+              registerForm.register('confirm_password'),
+              registerForm.formState.errors.confirm_password?.message,
+              showConfirmPassword,
+              () => setShowConfirmPassword((p) => !p),
+              'new-password',
+            )}
 
             <div className="auth-field-row">
               <div className="auth-field">
@@ -402,63 +471,92 @@ export default function AuthModal({ state, onClose, onViewChange }: AuthModalPro
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
 
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+
+            <button type="button" className="auth-btn-google" onClick={handleGoogleLogin}>
+              <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: 10 }}>
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+
             <p className="auth-switch-text">
               Already have an account?{' '}
               <button type="button" className="auth-link" onClick={() => onViewChange('login')}>
-                Login
+                Sign In
               </button>
             </p>
           </form>
         )}
 
-        {/* OTP VIEW */}
-        {state.view === 'otp' && (
-          <div className="auth-otp-section">
-            <OTPInput
-              length={6}
-              value={otpValue}
-              onChange={setOtpValue}
-              error={message?.type === 'error'}
-              disabled={loading}
-              autoFocus
-            />
+        {/* ═══════════ FORGOT PASSWORD VIEW ═══════════ */}
+        {state.view === 'forgot' && (
+          <form onSubmit={handleForgotSubmit} noValidate>
+            <div className="auth-field">
+              <label htmlFor="forgot-email" className="auth-label">Email Address</label>
+              <input
+                id="forgot-email"
+                type="email"
+                className="auth-input"
+                placeholder="your@email.com"
+                autoComplete="email"
+                autoFocus
+                {...forgotForm.register('email')}
+              />
+              {forgotForm.formState.errors.email && (
+                <p className="auth-error">{forgotForm.formState.errors.email.message}</p>
+              )}
+            </div>
 
+            <button type="submit" className="auth-btn-primary" disabled={loading}>
+              {loading ? <span className="auth-spinner"></span> : null}
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </button>
+
+            <p className="auth-switch-text" style={{ marginTop: 16 }}>
+              Remember your password?{' '}
+              <button type="button" className="auth-link" onClick={() => onViewChange('login')}>
+                Back to Sign In
+              </button>
+            </p>
+          </form>
+        )}
+
+        {/* ═══════════ FORGOT PASSWORD SUCCESS VIEW ═══════════ */}
+        {state.view === 'forgot-success' && (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: '#ecfdf5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+            }}>
+              <i className="fas fa-envelope-open-text" style={{ fontSize: '1.6rem', color: '#065f46' }}></i>
+            </div>
+            <p style={{ color: '#4A2010', fontSize: '0.95rem', lineHeight: 1.7, marginBottom: 24 }}>
+              We&apos;ve sent a password reset link to your email address. 
+              Please check your inbox and click the link to set a new password.
+            </p>
+            <p style={{ color: '#7A5030', fontSize: '0.85rem', marginBottom: 24 }}>
+              Didn&apos;t receive the email? Check your spam folder.
+            </p>
             <button
               type="button"
               className="auth-btn-primary"
-              onClick={handleVerifyOTP}
-              disabled={otpValue.length !== 6 || loading}
-              style={{ marginTop: 24 }}
+              onClick={() => onViewChange('login')}
+              style={{ width: '100%' }}
             >
-              {loading ? <span className="auth-spinner"></span> : null}
-              {loading ? 'Verifying...' : 'Verify OTP'}
+              Back to Sign In
             </button>
-
-            <div className="auth-resend-section">
-              {countdown > 0 ? (
-                <p className="auth-resend-text">
-                  Resend OTP in <span className="auth-countdown">{countdown}s</span>
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  className="auth-link"
-                  onClick={handleResendOTP}
-                  disabled={loading}
-                >
-                  Resend OTP
-                </button>
-              )}
-
-              <button
-                type="button"
-                className="auth-link"
-                onClick={() => onViewChange('login', state.email)}
-                style={{ marginTop: 8 }}
-              >
-                Use different email
-              </button>
-            </div>
           </div>
         )}
       </div>

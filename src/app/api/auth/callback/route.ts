@@ -12,6 +12,12 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      // For password recovery, check if user needs profile completion
+      if (next === '/reset-password') {
+        return NextResponse.redirect(`${origin}/reset-password`)
+      }
+
+      // For Google OAuth, check profile completion
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
@@ -30,5 +36,6 @@ export async function GET(request: Request) {
     }
   }
 
+  // Error — redirect with error flag
   return NextResponse.redirect(`${origin}/?auth=error`)
 }

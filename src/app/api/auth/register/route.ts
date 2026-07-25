@@ -21,9 +21,12 @@ export async function POST(request: Request) {
 
     const { full_name, email, password, whatsapp_number, mobile_number, area, city, pincode } = validationResult.data
 
-    // Sanitize string inputs
+    // Clean email — DON'T use sanitizeString (it strips < > ' " which can corrupt emails)
+    // Zod's email() already validates format, just normalize case
+    const cleanEmail = email.toLowerCase().trim()
+
+    // Sanitize string inputs (safe for names, areas, cities)
     const cleanName = sanitizeString(full_name).trim()
-    const cleanEmail = sanitizeString(email).toLowerCase().trim()
     const cleanArea = sanitizeString(area).trim()
     const cleanCity = sanitizeString(city).trim()
 
@@ -45,13 +48,18 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Check if email is already registered
-    const existingProfile = await getProfileByEmail(cleanEmail)
-    if (existingProfile) {
-      return NextResponse.json(
-        { success: false, message: 'This email is already registered. Please log in instead.' },
-        { status: 409 }
-      )
+    // 3. Check if email is already registered (wrapped in try for safety)
+    try {
+      const existingProfile = await getProfileByEmail(cleanEmail)
+      if (existingProfile) {
+        return NextResponse.json(
+          { success: false, message: 'This email is already registered. Please log in instead.' },
+          { status: 409 }
+        )
+      }
+    } catch (err) {
+      console.error('[REGISTER] Profile check failed (may need migration 002):', err)
+      // Continue — the RPC function might not exist yet
     }
 
     const supabase = await createServerClient()
@@ -92,6 +100,16 @@ export async function POST(request: Request) {
         )
       }
 
+      if (msg.includes('email not confirmed') || msg.includes('confirmation')) {
+        // User was created but needs email confirmation — treat as success
+        return NextResponse.json({
+          success: true,
+          message: 'Registration successful! Please check your email to verify your account, then log in.',
+          data: { email: cleanEmail },
+        })
+      }
+
+      console.error('[REGISTER ERROR] Supabase signUp failed:', msg, error.message)
       return NextResponse.json(
         { success: false, message: 'Registration failed. Please try again.' },
         { status: 500 }
@@ -114,8 +132,9 @@ export async function POST(request: Request) {
           provider: 'email',
           profile_completed: true,
         })
-      } catch {
+      } catch (err) {
         // Trigger should have created the profile — non-fatal
+        console.error('[REGISTER] Profile creation safety-net failed (trigger should have handled it):', err)
       }
     }
 

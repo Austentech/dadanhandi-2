@@ -110,3 +110,21 @@ Stage Summary:
 - Input sanitization: all text inputs sanitized via sanitizeString(), no XSS characters
 - Forgot password: email validation → recovery link via Supabase SMTP → dedicated reset page → updateUser
 - User MUST set "Confirm email" to OFF in Supabase Dashboard for immediate login after registration
+
+---
+Task ID: 21
+Agent: Main Agent
+Task: Fix 4 auth bugs — Google login message, forgot password redirect, registration error, post-reset login
+
+Work Log:
+- Issue 1: Login route now checks profile before password auth — if provider=google, returns "This account uses Google authentication. Please click Continue with Google to sign in."
+- Issue 2: Added client-side hash fragment detection in ClientProviders.tsx — when Supabase email lands on home page with #type=recovery, auto-redirects to /reset-password. Also fixed callback route to use RPC for profile check and redirect errors to /reset-password?auth=error
+- Issue 3: Registration route fixed — removed sanitizeString from email (was corrupting valid emails), wrapped getProfileByEmail in try/catch (prevents crash if RPC doesn't exist), added email confirmation handling
+- Issue 4: Reset password route — removed signOut after password update, user stays logged in with new password. ResetPasswordForm uses window.location.href for full page reload after redirect
+- Build verified: zero errors, all 22 routes compiled successfully
+
+Stage Summary:
+- Google auth users now get clear "use Google login" message instead of generic "invalid credentials"
+- Forgot password email links now always land on /reset-password page (handles both PKCE code and hash fragment flows)
+- Registration is more robust with better error handling and email-safe sanitization
+- Post-password-reset user stays logged in (no more "logged out after reset" issue)

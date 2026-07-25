@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/client-server'
+import { getProfileByAuthUserId } from '@/services/profile-service'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -12,23 +13,22 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // For password recovery, check if user needs profile completion
+      // For password recovery, always redirect to reset-password page
       if (next === '/reset-password') {
         return NextResponse.redirect(`${origin}/reset-password`)
       }
 
-      // For Google OAuth, check profile completion
+      // For Google OAuth, check profile completion using RPC (bypasses RLS)
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('profile_completed')
-          .eq('auth_user_id', user.id)
-          .single()
-
-        if (profile && !profile.profile_completed) {
-          return NextResponse.redirect(`${origin}/auth/complete-profile`)
+        try {
+          const profile = await getProfileByAuthUserId(user.id)
+          if (profile && !profile.profile_completed) {
+            return NextResponse.redirect(`${origin}/auth/complete-profile`)
+          }
+        } catch {
+          // Profile check failed — continue with normal redirect
         }
       }
 
@@ -37,5 +37,5 @@ export async function GET(request: Request) {
   }
 
   // Error — redirect with error flag
-  return NextResponse.redirect(`${origin}/?auth=error`)
+  return NextResponse.redirect(`${origin}/reset-password?auth=error`)
 }

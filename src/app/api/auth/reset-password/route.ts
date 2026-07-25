@@ -64,12 +64,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // 4. Sign out after password reset (user needs to re-login with new password)
-    await supabase.auth.signOut()
+    // 4. Keep the session active — user is now logged in with the new password
+    // Don't sign out. The session from the recovery flow is still valid.
 
     return NextResponse.json({
       success: true,
-      message: 'Password updated successfully! You can now log in with your new password.',
+      message: 'Password updated successfully! You are now logged in.',
       data: { redirectTo: '/?auth=reset-success' },
     })
   } catch (err) {

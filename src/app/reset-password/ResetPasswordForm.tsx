@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validation/schemas'
 
 export default function ResetPasswordForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -36,7 +35,8 @@ export default function ResetPasswordForm() {
 
       if (data.success) {
         setMessage({ type: 'success', text: data.message })
-        setTimeout(() => router.push(data.data?.redirectTo || '/'), 2000)
+        // Redirect after short delay — user is already logged in
+        setTimeout(() => window.location.href = data.data?.redirectTo || '/', 1500)
       } else {
         setMessage({ type: 'error', text: data.message })
       }

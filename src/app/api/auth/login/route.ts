@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/client-server'
 import { checkDualRateLimit, resetRateLimit } from '@/lib/security/rate-limiter'
 import { loginSchema } from '@/lib/validation/schemas'
 import { sanitizeString } from '@/lib/security/utils'
+import { getProfileByEmail } from '@/services/profile-service'
 
 export async function POST(request: Request) {
   try {
@@ -19,8 +20,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Sanitize inputs
-    const cleanEmail = sanitizeString(result.data.email).toLowerCase().trim()
+    // Clean email (don't use sanitizeString — it can corrupt valid emails, Zod already validated)
+    const cleanEmail = result.data.email.toLowerCase().trim()
 
     // 2. Rate limiting
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -40,7 +41,21 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Sign in with email + password
+    // 3. Check if this email belongs to a Google auth user BEFORE attempting password login
+    try {
+      const existingProfile = await getProfileByEmail(cleanEmail)
+      if (existingProfile && existingProfile.provider === 'google') {
+        return NextResponse.json(
+          { success: false, message: 'This account uses Google authentication. Please click "Continue with Google" to sign in.' },
+          { status: 403 }
+        )
+      }
+    } catch {
+      // Profile check failed — continue with password login attempt
+      // (the RPC might not exist if migration wasn't run)
+    }
+
+    // 4. Sign in with email + password
     const supabase = await createServerClient()
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -79,7 +94,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // 4. Reset rate limits on successful login
+    // 5. Reset rate limits on successful login
     resetRateLimit(ip, 'auth_attempt')
     resetRateLimit(cleanEmail, 'auth_attempt')
 

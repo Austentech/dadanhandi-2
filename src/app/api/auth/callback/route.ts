@@ -19,23 +19,25 @@ export async function GET(request: Request) {
       }
 
       // For Google OAuth, check profile completion using RPC (bypasses RLS)
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
 
-      if (user) {
-        try {
+        if (user) {
           const profile = await getProfileByAuthUserId(user.id)
           if (profile && !profile.profile_completed) {
             return NextResponse.redirect(`${origin}/auth/complete-profile`)
           }
-        } catch {
-          // Profile check failed — continue with normal redirect
         }
+      } catch {
+        // Profile check failed — continue with normal redirect
       }
 
       return NextResponse.redirect(`${origin}${next}`)
+    } else {
+      console.error('[AUTH CALLBACK] exchangeCodeForSession error:', error.message)
     }
   }
 
-  // Error — redirect with error flag
+  // Error — redirect to reset-password with error flag
   return NextResponse.redirect(`${origin}/reset-password?auth=error`)
 }

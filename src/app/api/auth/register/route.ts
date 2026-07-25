@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/client-server'
 import { checkDualRateLimit } from '@/lib/security/rate-limiter'
 import { registerSchema } from '@/lib/validation/schemas'
 import { createProfile, getProfileByEmail } from '@/services/profile-service'
-import { sanitizeString } from '@/lib/security/utils'
+import { sanitizeString, sanitizeEmail } from '@/lib/security/utils'
 
 export async function POST(request: Request) {
   try {
@@ -21,14 +21,13 @@ export async function POST(request: Request) {
 
     const { full_name, email, password, whatsapp_number, mobile_number, area, city, pincode } = validationResult.data
 
-    // Clean email — DON'T use sanitizeString (it strips < > ' " which can corrupt emails)
-    // Zod's email() already validates format, just normalize case
-    const cleanEmail = email.toLowerCase().trim()
+    // Use sanitizeEmail — DO NOT use sanitizeString on emails (it can corrupt them)
+    const cleanEmail = sanitizeEmail(email)
 
-    // Sanitize string inputs (safe for names, areas, cities)
-    const cleanName = sanitizeString(full_name).trim()
-    const cleanArea = sanitizeString(area).trim()
-    const cleanCity = sanitizeString(city).trim()
+    // sanitizeString only strips < > " (preserves apostrophes like O'Brien)
+    const cleanName = sanitizeString(full_name)
+    const cleanArea = sanitizeString(area)
+    const cleanCity = sanitizeString(city)
 
     // 2. Rate limiting
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -48,7 +47,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Check if email is already registered (wrapped in try for safety)
+    // 3. Check if email is already registered (safe wrapper in case RPC doesn't exist)
     try {
       const existingProfile = await getProfileByEmail(cleanEmail)
       if (existingProfile) {
@@ -58,32 +57,62 @@ export async function POST(request: Request) {
         )
       }
     } catch (err) {
-      console.error('[REGISTER] Profile check failed (may need migration 002):', err)
-      // Continue — the RPC function might not exist yet
+      console.error('[REGISTER] Profile check RPC failed (migration 002 may not be run):', err)
+      // Continue anyway — the trigger will handle profile creation
     }
 
-    const supabase = await createServerClient()
+    // 4. Create Supabase server client
+    let supabase
+    try {
+      supabase = await createServerClient()
+    } catch (err) {
+      console.error('[REGISTER] Supabase client creation failed:', err)
+      return NextResponse.json(
+        { success: false, message: 'Server configuration error. Please contact support.' },
+        { status: 500 }
+      )
+    }
 
-    // 4. Sign up user with email + password
-    // Supabase automatically hashes the password with bcrypt — never stored in plaintext
-    const { data, error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password,
-      options: {
-        data: {
-          full_name: cleanName,
-          whatsapp_number: whatsapp_number,
-          mobile_number: mobile_number || null,
-          area: cleanArea,
-          city: cleanCity,
-          pincode: pincode,
-          provider: 'email',
+    // 5. Sign up user with email + password
+    // Supabase automatically hashes the password with bcrypt
+    let signUpResult
+    try {
+      signUpResult = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://dadanhandihotel.com'}`,
+          data: {
+            full_name: cleanName,
+            whatsapp_number: whatsapp_number,
+            mobile_number: mobile_number || null,
+            area: cleanArea,
+            city: cleanCity,
+            pincode: pincode,
+            provider: 'email',
+          },
         },
-      },
-    })
+      })
+    } catch (err) {
+      console.error('[REGISTER] signUp network/unknown error:', err)
+      return NextResponse.json(
+        { success: false, message: 'Registration failed due to a network error. Please try again.' },
+        { status: 500 }
+      )
+    }
 
+    const { data, error } = signUpResult
+
+    // Handle Supabase signUp errors with detailed messages
     if (error) {
       const msg = (error.message || '').toLowerCase()
+      const status = error.status || 500
+
+      console.error('[REGISTER ERROR] Supabase signUp error:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      })
 
       if (msg.includes('already registered') || msg.includes('already been registered') ||
           msg.includes('already in use') || msg.includes('identity already exists')) {
@@ -101,24 +130,56 @@ export async function POST(request: Request) {
       }
 
       if (msg.includes('email not confirmed') || msg.includes('confirmation')) {
-        // User was created but needs email confirmation — treat as success
-        return NextResponse.json({
-          success: true,
-          message: 'Registration successful! Please check your email to verify your account, then log in.',
-          data: { email: cleanEmail },
-        })
+        // User was created but email not confirmed — still success for us
+        if (data?.user) {
+          return NextResponse.json({
+            success: true,
+            message: 'Registration successful! Please check your email to verify your account, then log in.',
+            data: { email: cleanEmail },
+          })
+        }
       }
 
-      console.error('[REGISTER ERROR] Supabase signUp failed:', msg, error.message)
+      if (msg.includes('rate limit') || msg.includes('too many')) {
+        return NextResponse.json(
+          { success: false, message: 'Too many registration attempts. Please wait a few minutes and try again.' },
+          { status: 429 }
+        )
+      }
+
+      if (msg.includes('signup') && msg.includes('disabled')) {
+        return NextResponse.json(
+          { success: false, message: 'Email registration is currently disabled. Please use Google login or contact support.' },
+          { status: 403 }
+        )
+      }
+
+      if (msg.includes('invalid email') || msg.includes('unable to validate')) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid email address. Please check and try again.' },
+          { status: 400 }
+        )
+      }
+
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
+        return NextResponse.json(
+          { success: false, message: 'Network error. Please check your connection and try again.' },
+          { status: 503 }
+        )
+      }
+
+      // Unknown error — return with Supabase error details for debugging
       return NextResponse.json(
-        { success: false, message: 'Registration failed. Please try again.' },
-        { status: 500 }
+        { success: false, message: `Registration failed: ${error.message || 'Unknown error. Please try again.'}` },
+        { status: status >= 400 && status < 500 ? status : 500 }
       )
     }
 
-    // 5. Profile auto-created by database trigger (handle_new_user)
-    // Safety net: also create via RPC (bypasses RLS)
-    if (data.user) {
+    // 6. signUp succeeded — create profile
+    // If email confirmation is ON: data.user exists but data.session is null — still create profile
+    // If email confirmation is OFF: data.user and data.session both exist
+
+    if (data?.user) {
       try {
         await createProfile({
           auth_user_id: data.user.id,
@@ -133,18 +194,24 @@ export async function POST(request: Request) {
           profile_completed: true,
         })
       } catch (err) {
-        // Trigger should have created the profile — non-fatal
-        console.error('[REGISTER] Profile creation safety-net failed (trigger should have handled it):', err)
+        // Profile creation failed — but the auth user was created
+        // The database trigger should have handled it, so this is a safety net
+        console.error('[REGISTER] Profile creation RPC failed:', err)
       }
     }
 
+    // If no session = email confirmation required
+    const needsConfirmation = !data?.session
+
     return NextResponse.json({
       success: true,
-      message: 'Registration successful! You can now log in with your email and password.',
+      message: needsConfirmation
+        ? 'Registration successful! Please check your email to verify your account, then log in.'
+        : 'Registration successful! You can now log in with your email and password.',
       data: { email: cleanEmail },
     })
   } catch (err) {
-    console.error('[REGISTER ERROR]', err)
+    console.error('[REGISTER UNEXPECTED ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong during registration. Please try again.' },
       { status: 500 }

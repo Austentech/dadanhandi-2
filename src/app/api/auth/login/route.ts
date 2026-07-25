@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/client-server'
 import { checkDualRateLimit, resetRateLimit } from '@/lib/security/rate-limiter'
 import { loginSchema } from '@/lib/validation/schemas'
-import { sanitizeString } from '@/lib/security/utils'
 import { getProfileByEmail } from '@/services/profile-service'
+import { sanitizeEmail } from '@/lib/security/utils'
 
 export async function POST(request: Request) {
   try {
@@ -20,8 +20,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Clean email (don't use sanitizeString — it can corrupt valid emails, Zod already validated)
-    const cleanEmail = result.data.email.toLowerCase().trim()
+    const cleanEmail = sanitizeEmail(result.data.email)
 
     // 2. Rate limiting
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -52,12 +51,12 @@ export async function POST(request: Request) {
       }
     } catch {
       // Profile check failed — continue with password login attempt
-      // (the RPC might not exist if migration wasn't run)
     }
 
-    // 4. Sign in with email + password
+    // 4. Create Supabase client
     const supabase = await createServerClient()
 
+    // 5. Sign in with email + password
     const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password,
@@ -66,7 +65,8 @@ export async function POST(request: Request) {
     if (error) {
       const msg = (error.message || '').toLowerCase()
 
-      // Provide user-friendly error messages without exposing system details
+      console.error('[LOGIN ERROR]', { message: error.message, status: error.status })
+
       if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
         return NextResponse.json(
           { success: false, message: 'Invalid email or password. Please check your credentials.' },
@@ -81,10 +81,17 @@ export async function POST(request: Request) {
         )
       }
 
-      if (msg.includes('too many requests')) {
+      if (msg.includes('too many requests') || msg.includes('rate limit')) {
         return NextResponse.json(
           { success: false, message: 'Too many attempts. Please wait a moment and try again.' },
           { status: 429 }
+        )
+      }
+
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
+        return NextResponse.json(
+          { success: false, message: 'Network error. Please check your connection and try again.' },
+          { status: 503 }
         )
       }
 
@@ -94,7 +101,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // 5. Reset rate limits on successful login
+    // 6. Reset rate limits on successful login
     resetRateLimit(ip, 'auth_attempt')
     resetRateLimit(cleanEmail, 'auth_attempt')
 
@@ -104,7 +111,7 @@ export async function POST(request: Request) {
       data: { redirectTo: '/' },
     })
   } catch (err) {
-    console.error('[LOGIN ERROR]', err)
+    console.error('[LOGIN UNEXPECTED ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }

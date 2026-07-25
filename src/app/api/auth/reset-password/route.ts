@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/client-server'
 import { resetPasswordSchema } from '@/lib/validation/schemas'
-import { sanitizeString } from '@/lib/security/utils'
 
 export async function POST(request: Request) {
   try {
@@ -22,12 +21,20 @@ export async function POST(request: Request) {
       )
     }
 
-    // Sanitize password (remove any dangerous characters — though passwords should be literal)
-    const cleanPassword = sanitizeString(result.data.password)
+    // IMPORTANT: Do NOT sanitize the password — passwords are literal strings.
+    // sanitizeString would strip special characters like < > " from passwords,
+    // making them not match what the user typed and potentially weaker.
+    const newPassword = result.data.password
 
-    // 2. Get current user session
+    // 2. Create Supabase client
     const supabase = await createServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+
+    // 3. Check for active session (from recovery flow or login)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError) {
+      console.error('[RESET-PASSWORD] getUser error:', userError.message)
+    }
 
     if (!user) {
       return NextResponse.json(
@@ -36,13 +43,18 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Update password (Supabase hashes with bcrypt automatically)
+    // 4. Update password (Supabase hashes with bcrypt automatically)
     const { error } = await supabase.auth.updateUser({
-      password: cleanPassword,
+      password: newPassword,
     })
 
     if (error) {
       const msg = (error.message || '').toLowerCase()
+
+      console.error('[RESET-PASSWORD] updateUser error:', {
+        message: error.message,
+        status: error.status,
+      })
 
       if (msg.includes('same as old password') || msg.includes('new password should be different')) {
         return NextResponse.json(
@@ -58,14 +70,22 @@ export async function POST(request: Request) {
         )
       }
 
+      if (msg.includes('session') || msg.includes('expired') || msg.includes('token')) {
+        return NextResponse.json(
+          { success: false, message: 'Your session has expired. Please request a new password reset link.' },
+          { status: 401 }
+        )
+      }
+
       return NextResponse.json(
         { success: false, message: 'Failed to update password. Please try again.' },
         { status: 500 }
       )
     }
 
-    // 4. Keep the session active — user is now logged in with the new password
-    // Don't sign out. The session from the recovery flow is still valid.
+    // 5. Keep the session active — do NOT sign out
+    // The recovery session remains valid after password update.
+    // The user is now logged in with their new password.
 
     return NextResponse.json({
       success: true,
@@ -73,7 +93,7 @@ export async function POST(request: Request) {
       data: { redirectTo: '/?auth=reset-success' },
     })
   } catch (err) {
-    console.error('[RESET-PASSWORD ERROR]', err)
+    console.error('[RESET-PASSWORD UNEXPECTED ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }

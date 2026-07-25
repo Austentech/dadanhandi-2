@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/client-server'
 import { checkDualRateLimit } from '@/lib/security/rate-limiter'
 import { forgotPasswordSchema } from '@/lib/validation/schemas'
 import { getProfileByEmail } from '@/services/profile-service'
-import { sanitizeString } from '@/lib/security/utils'
+import { sanitizeEmail } from '@/lib/security/utils'
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const cleanEmail = sanitizeString(result.data.email).toLowerCase().trim()
+    const cleanEmail = sanitizeEmail(result.data.email)
 
     // 2. Rate limiting
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -39,29 +39,43 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Check if user exists — don't reveal if email doesn't exist (security)
-    // But we do check so we can give a more helpful message
-    const profile = await getProfileByEmail(cleanEmail)
+    // 3. Validate: Check if this email is actually registered
+    let profile = null
+    try {
+      profile = await getProfileByEmail(cleanEmail)
+    } catch (err) {
+      console.error('[FORGOT-PASSWORD] Profile lookup failed:', err)
+    }
 
     if (!profile) {
-      // Don't reveal that the email doesn't exist — generic message
-      // This prevents email enumeration attacks
-      return NextResponse.json({
-        success: true,
-        message: 'If an account exists with this email, you will receive a password reset link.',
-      })
+      // Email NOT found — return clear error (user requested this)
+      return NextResponse.json(
+        { success: false, message: 'No account found with this email address. Please check your email or register a new account.' },
+        { status: 404 }
+      )
     }
 
-    // Google users can't reset password via email (they use Google login)
+    // Google users can't reset password — they use Google login
     if (profile.provider === 'google') {
-      return NextResponse.json({
-        success: true,
-        message: 'This account uses Google login. Please use "Continue with Google" to sign in.',
-      })
+      return NextResponse.json(
+        { success: false, message: 'This account uses Google authentication. Please click "Continue with Google" to sign in.' },
+        { status: 403 }
+      )
     }
 
-    // 4. Send password reset email via Supabase
-    const supabase = await createServerClient()
+    // 4. Create Supabase client
+    let supabase
+    try {
+      supabase = await createServerClient()
+    } catch (err) {
+      console.error('[FORGOT-PASSWORD] Supabase client creation failed:', err)
+      return NextResponse.json(
+        { success: false, message: 'Server error. Please try again later.' },
+        { status: 500 }
+      )
+    }
+
+    // 5. Send password reset email via Supabase
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://dadanhandihotel.com'
 
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
@@ -71,27 +85,46 @@ export async function POST(request: Request) {
     if (error) {
       const msg = (error.message || '').toLowerCase()
 
+      console.error('[FORGOT-PASSWORD] resetPasswordForEmail error:', {
+        message: error.message,
+        status: error.status,
+      })
+
       if (msg.includes('email not confirmed')) {
         return NextResponse.json(
-          { success: false, message: 'Your email has not been verified yet. Please check your inbox.' },
+          { success: false, message: 'Your email has not been verified yet. Please check your inbox for a verification email.' },
           { status: 403 }
         )
       }
 
-      // Generic error — don't expose details
+      if (msg.includes('rate limit') || msg.includes('too many')) {
+        return NextResponse.json(
+          { success: false, message: 'Too many reset attempts. Please wait a few minutes and try again.' },
+          { status: 429 }
+        )
+      }
+
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
+        return NextResponse.json(
+          { success: false, message: 'Network error. Please check your connection and try again.' },
+          { status: 503 }
+        )
+      }
+
+      // For any other error — tell the user there was an issue sending the email
       return NextResponse.json(
-        { success: true,
-          message: 'If an account exists with this email, you will receive a password reset link.',
-        }
+        { success: false, message: `Failed to send reset email: ${error.message || 'Please try again.'}` },
+        { status: 500 }
       )
     }
 
+    // 6. Success
     return NextResponse.json({
       success: true,
       message: 'Password reset link sent to your email! Click the link to set a new password.',
     })
   } catch (err) {
-    console.error('[FORGOT-PASSWORD ERROR]', err)
+    console.error('[FORGOT-PASSWORD UNEXPECTED ERROR]', err)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }

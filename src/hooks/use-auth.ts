@@ -81,9 +81,10 @@ export function useAuth() {
       async (event, session) => {
         if (!mounted) return
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (session?.user) {
           const profile = await fetchProfile(session.user.id)
           if (!mounted) return
+
           setState({
             user: session.user,
             profile,
@@ -92,11 +93,6 @@ export function useAuth() {
           })
         } else if (event === 'SIGNED_OUT') {
           setState(unauthenticatedState)
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          setState((prev) => ({
-            ...prev,
-            user: session.user,
-          }))
         }
       }
     )

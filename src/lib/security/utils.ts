@@ -24,11 +24,23 @@ export async function getClientIp(): Promise<string> {
 
 /**
  * Sanitize a string by removing potentially dangerous characters.
+ * Preserves single quotes (apostrophes in names like O'Brien, D'Souza).
+ * Only strips angle brackets and double quotes which can cause HTML injection.
  */
 export function sanitizeString(input: string): string {
+  if (!input) return ''
   return input
-    .replace(/[<>'"]/g, '')
+    .replace(/[<>"]/g, '')
     .trim()
+}
+
+/**
+ * Sanitize an email address — only lowercase and trim.
+ * DO NOT use sanitizeString on emails — it can corrupt valid addresses.
+ */
+export function sanitizeEmail(input: string): string {
+  if (!input) return ''
+  return input.toLowerCase().trim()
 }
 
 /**

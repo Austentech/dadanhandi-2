@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client-browser'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validation/schemas'
@@ -12,8 +13,42 @@ export default function ResetPasswordForm() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [hasSession, setHasSession] = useState(false)
 
   const authError = searchParams.get('auth')
+
+  // Verify session exists before showing the form
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setCheckingSession(false)
+      return
+    }
+
+    const checkSession = async () => {
+      try {
+        const supabase = createClient()
+        if (!supabase) {
+          setCheckingSession(false)
+          return
+        }
+
+        // Give Supabase a moment to process hash fragment tokens
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session && session.user) {
+          setHasSession(true)
+        }
+      } catch {
+        // Session check failed
+      } finally {
+        setCheckingSession(false)
+      }
+    }
+
+    checkSession()
+  }, [])
 
   const form = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
@@ -35,8 +70,11 @@ export default function ResetPasswordForm() {
 
       if (data.success) {
         setMessage({ type: 'success', text: data.message })
-        // Redirect after short delay — user is already logged in
-        setTimeout(() => window.location.href = data.data?.redirectTo || '/', 1500)
+        // Full page reload — ensures session cookies are properly sent
+        // and the entire app re-initializes with the new logged-in state
+        setTimeout(() => {
+          window.location.href = data.data?.redirectTo || '/'
+        }, 1500)
       } else {
         setMessage({ type: 'error', text: data.message })
       }
@@ -46,6 +84,18 @@ export default function ResetPasswordForm() {
       setLoading(false)
     }
   })
+
+  // Loading state while checking session
+  if (checkingSession) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40 }}>
+        <div className="auth-spinner" style={{ margin: '0 auto', width: 32, height: 32 }}></div>
+        <p style={{ color: '#7A5030', marginTop: 16, fontSize: '0.9rem' }}>
+          Verifying your reset link...
+        </p>
+      </div>
+    )
+  }
 
   return (
     <>

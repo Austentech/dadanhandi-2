@@ -12,7 +12,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const mobileOpenRef = useRef(false);
-  const { isAuthenticated, isLoading, profile } = useAuth();
+  const { isAuthenticated, isLoading, profile, signOut } = useAuth();
   const { openAuthModal, openUserDrawer } = useAuthContext();
 
   const closeMobile = useCallback(() => {
@@ -118,22 +118,33 @@ export default function Navbar() {
             {link.label}
           </Link>
         ))}
-        {/* Mobile auth button */}
+        {/* Mobile auth section */}
         <div style={{ marginTop: 24, padding: "12px 16px", borderTop: "1px solid rgba(122,12,12,0.15)" }}>
           {isAuthenticated && firstName ? (
-            <button
-              className="nav-user-btn"
-              onClick={() => {
-                toggleMobile()
-                openUserDrawer()
-              }}
-              style={{ width: "100%", justifyContent: "center", padding: "10px 16px" }}
-            >
-              <span className="nav-user-icon">
-                <i className="fas fa-user"></i>
-              </span>
-              <span className="nav-user-name">Hello, {firstName}</span>
-            </button>
+            <>
+              <Link
+                href="/account"
+                className="nav-user-btn"
+                onClick={toggleMobile}
+                style={{ width: "100%", justifyContent: "center", padding: "10px 16px", marginBottom: 10, textDecoration: "none" }}
+              >
+                <span className="nav-user-icon">
+                  <i className="fas fa-user"></i>
+                </span>
+                <span className="nav-user-name">Hello, {firstName}</span>
+              </Link>
+              <button
+                className="mobile-logout-btn"
+                onClick={async () => {
+                  toggleMobile()
+                  await signOut()
+                  window.location.href = "/"
+                }}
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+              </button>
+            </>
           ) : (
             <>
               <button

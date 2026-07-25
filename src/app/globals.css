@@ -2503,3 +2503,60 @@ footer {
   .auth-field-row { grid-template-columns: 1fr; gap: 14px; }
   .user-drawer { width: 100%; max-width: 100%; }
 }
+
+/* ---- MOBILE LOGOUT BUTTON (in nav panel) ---- */
+.mobile-logout-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: 1.5px solid #dc2626;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: var(--font-nunito), sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.mobile-logout-btn:hover {
+  background: #fef2f2;
+}
+
+/* ---- RESPONSIVE PROFILE GRID ---- */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.auth-card-responsive {
+  overflow: hidden;
+}
+
+@media (max-width: 575px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .auth-card-responsive {
+    padding: 20px 16px;
+  }
+}
+
+/* ---- GLOBAL ANTI-OVERFLOW ---- */
+.auth-card,
+.page-hero .container-custom,
+.account-section .container-custom {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow-x: hidden;
+}
+
+a, p, span, div {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}

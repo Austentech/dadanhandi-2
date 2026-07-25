@@ -18,18 +18,37 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/reset-password`)
       }
 
-      // For Google OAuth, check profile completion using RPC (bypasses RLS)
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
+      // Get user info for deciding where to redirect
+      const { data: { user } } = await supabase.auth.getUser()
 
-        if (user) {
-          const profile = await getProfileByAuthUserId(user.id)
-          if (profile && !profile.profile_completed) {
-            return NextResponse.redirect(`${origin}/auth/complete-profile`)
+      if (user) {
+        // Check if this was an email verification (not Google OAuth)
+        // Google OAuth users have 'provider' in their app_metadata or identities
+        const isGoogleUser = user.app_metadata?.provider === 'google' ||
+          (user.app_metadata?.providers && user.app_metadata.providers.includes('google'))
+
+        if (isGoogleUser) {
+          // Google OAuth — check profile completion
+          try {
+            const profile = await getProfileByAuthUserId(user.id)
+            if (profile && !profile.profile_completed) {
+              return NextResponse.redirect(`${origin}/auth/complete-profile`)
+            }
+          } catch {
+            // Profile check failed — continue with normal redirect
+          }
+        } else {
+          // Email/password user — this callback is likely from email verification
+          // Check if email was just confirmed
+          const emailConfirmed = user.email_confirmed_at !== null &&
+            user.confirmed_at !== null
+
+          if (emailConfirmed) {
+            // Email just verified — redirect to home with success flag
+            const redirectTo = next === '/' ? '/?email_verified=true' : `${next}?email_verified=true`
+            return NextResponse.redirect(`${origin}${redirectTo}`)
           }
         }
-      } catch {
-        // Profile check failed — continue with normal redirect
       }
 
       return NextResponse.redirect(`${origin}${next}`)

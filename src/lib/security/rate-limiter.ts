@@ -62,7 +62,7 @@ export interface RateLimitResult {
  */
 export function checkRateLimit(
   identifier: string,
-  type: 'otp_request' | 'auth_attempt' | 'api_call',
+  type: string,
   config?: Partial<RateLimitConfig>
 ): RateLimitResult {
   cleanup()
@@ -140,7 +140,7 @@ export function resetRateLimit(identifier: string, type: string): void {
 export function checkDualRateLimit(
   ip: string,
   email: string,
-  type: 'otp_request' | 'auth_attempt',
+  type: string,
   config?: Partial<RateLimitConfig>
 ): RateLimitResult {
   const ipResult = checkRateLimit(ip, type, config)

@@ -67,42 +67,42 @@ export default function AccountPage({
         <section style={{ padding: '50px 0 80px' }}>
           <div className="container-custom" style={{ maxWidth: 700, margin: '0 auto' }}>
             {/* Profile Card */}
-            <div className="auth-card" style={{ marginBottom: 32 }}>
+            <div className="auth-card auth-card-responsive" style={{ marginBottom: 32 }}>
               <h3 style={{ fontFamily: 'var(--font-playfair), serif', fontSize: '1.3rem', fontWeight: 700, color: '#7A0C0C', marginBottom: 20 }}>
                 Profile Information
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="profile-grid">
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>Full Name</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.full_name || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.full_name || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>Email</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.email || user.email || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.email || user.email || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>WhatsApp</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.whatsapp_number || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.whatsapp_number || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>Mobile</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.mobile_number || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.mobile_number || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>Area</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.area || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.area || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>City</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.city || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.city || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>Pincode</p>
-                  <p style={{ fontWeight: 600 }}>{profile?.pincode || '—'}</p>
+                  <p style={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.pincode || '—'}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '0.78rem', color: '#7A5030', marginBottom: 4 }}>Provider</p>
-                  <p style={{ fontWeight: 600, textTransform: 'capitalize' }}>{profile?.provider || '—'}</p>
+                  <p style={{ fontWeight: 600, textTransform: 'capitalize', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{profile?.provider || '—'}</p>
                 </div>
               </div>
               {profile && !profile.profile_completed && (

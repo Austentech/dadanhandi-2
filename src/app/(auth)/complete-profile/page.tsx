@@ -106,7 +106,7 @@ export default function CompleteProfilePage() {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="auth-field-row">
                 <div className="auth-field">
                   <label htmlFor="cp-city" className="auth-label">City *</label>
                   <input

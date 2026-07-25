@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip') || 'unknown'
 
-    const rateCheck = checkDualRateLimit(ip, cleanEmail, 'otp_request', {
+    const rateCheck = checkDualRateLimit(ip, cleanEmail, 'register_attempt', {
       maxAttempts: 3,
       windowMs: 60 * 1000,
       blockDurationMs: 300 * 1000,

@@ -5,21 +5,38 @@
  *
  * Behaviour:
  *  - On first visit to /menu in a browsing session, show modal.
- *  - User must click "I Understand" to dismiss.
+ *  - User can dismiss via:
+ *      a) "I Understand" button (primary)
+ *      b) "Close" button (secondary, in sticky footer)
+ *      c) X icon button (top-right corner, always visible)
+ *      d) Click on the backdrop
+ *      e) Press Esc
  *  - Acknowledgement is stored in sessionStorage (per-session) so the popup
  *    does NOT reappear during the same browsing session.
- *  - Behaviour is configurable: change STORAGE_KEY or STORAGE_TYPE to
- *    'localStorage' to persist across sessions.
+ *
+ * Layout strategy (fixes "can not scroll down" issue on mobile):
+ *  - Modal is split into 3 parts: Header / Scrollable Content / Sticky Footer
+ *  - Only the middle "menu-notice-points" area scrolls, NOT the whole modal
+ *  - Footer (with close buttons) is always visible — `position: sticky` at bottom
+ *  - X icon at top-right is always visible — `position: absolute`
+ *  - This means user can ALWAYS reach a close button, regardless of scroll position
+ *
+ * Mobile-friendly:
+ *  - Uses `dvh` (dynamic viewport units) with `vh` fallback for iOS Safari
+ *  - `overscroll-behavior: contain` prevents scroll chaining to body
+ *  - `-webkit-overflow-scrolling: touch` for iOS momentum scroll
+ *  - On small screens, modal aligns to top (`flex-start`) instead of center
  *
  * Accessibility:
  *  - Focus trap (Esc to close = same as "I Understand")
  *  - role="dialog" aria-modal="true"
- *  - Buttons have explicit labels
+ *  - All buttons have explicit aria-labels
+ *  - Initial focus goes to the primary "I Understand" button
  */
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const STORAGE_KEY = 'dadan_menu_notice_ack'
 const STORAGE_TYPE: 'sessionStorage' | 'localStorage' = 'sessionStorage'
@@ -54,6 +71,7 @@ const NOTICE_POINTS = [
 
 export default function MenuNoticeModal() {
   const [show, setShow] = useState(false)
+  const primaryBtnRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     try {
@@ -99,6 +117,14 @@ export default function MenuNoticeModal() {
     return () => document.removeEventListener('keydown', handler)
   }, [show])
 
+  // Move focus to the primary button when modal opens
+  useEffect(() => {
+    if (show && primaryBtnRef.current) {
+      const t = setTimeout(() => primaryBtnRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [show])
+
   if (!show) return null
 
   return (
@@ -113,6 +139,17 @@ export default function MenuNoticeModal() {
         className="menu-notice-modal"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Always-visible X close button (top-right) */}
+        <button
+          type="button"
+          className="menu-notice-close-x"
+          onClick={acknowledge}
+          aria-label="Close notice"
+        >
+          <i className="fas fa-times" aria-hidden="true"></i>
+        </button>
+
+        {/* Header — fixed at top, never scrolls */}
         <div className="menu-notice-header">
           <span className="menu-notice-icon">📋</span>
           <h2 id="menu-notice-title">Before You Order — Please Read</h2>
@@ -121,6 +158,7 @@ export default function MenuNoticeModal() {
           </p>
         </div>
 
+        {/* Scrollable content area — only this part scrolls */}
         <div className="menu-notice-points">
           {NOTICE_POINTS.map((p, i) => (
             <div key={i} className="menu-notice-point">
@@ -135,6 +173,7 @@ export default function MenuNoticeModal() {
           ))}
         </div>
 
+        {/* Sticky footer — always visible at the bottom */}
         <div className="menu-notice-footer">
           <button
             type="button"
@@ -148,7 +187,7 @@ export default function MenuNoticeModal() {
             type="button"
             className="menu-notice-btn-primary"
             onClick={acknowledge}
-            autoFocus
+            ref={primaryBtnRef}
           >
             I Understand
           </button>

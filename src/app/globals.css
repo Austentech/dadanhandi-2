@@ -2722,24 +2722,69 @@ a, p, span, div {
   inset: 0;
   background: rgba(44, 16, 8, 0.75);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  /* Allow overlay to scroll if modal taller than viewport (older browsers) */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   animation: auth-fade-in 0.2s ease;
 }
 
 .menu-notice-modal {
+  position: relative;
   background: var(--card-bg);
   border-radius: 16px;
-  padding: 32px 28px 24px;
+  padding: 32px 28px 16px;
   width: 100%;
   max-width: 540px;
+  /* Use dvh (dynamic viewport) for mobile, vh as fallback for older browsers.
+     This fixes the "can not scroll down" issue on iOS Safari where the
+     dynamic toolbar caused 90vh to be larger than the visible area. */
   max-height: 90vh;
-  overflow-y: auto;
+  max-height: 90dvh;
+  /* Modal becomes a flex container: header (auto) / points (1fr scroll) / footer (auto) */
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
   animation: auth-slide-up 0.3s ease;
+  /* Prevent body scroll chaining when user reaches end of modal scroll */
+  overscroll-behavior: contain;
+}
+
+/* The X close button — always visible at top-right */
+.menu-notice-close-x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--section-alt);
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+  z-index: 2;
+}
+
+.menu-notice-close-x:hover {
+  background: var(--dark-red);
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+.menu-notice-close-x:focus-visible {
+  outline: 2px solid var(--clay-orange);
+  outline-offset: 2px;
 }
 
 .menu-notice-header {
@@ -2771,7 +2816,30 @@ a, p, span, div {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  /* ONLY this section scrolls — header & footer stay fixed.
+     This is the core fix for "can not scroll down". */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-right: 4px; /* gutter so scroll bar doesn't overlap content */
+}
+
+/* Webkit scrollbar styling — slim, themed */
+.menu-notice-points::-webkit-scrollbar {
+  width: 6px;
+}
+.menu-notice-points::-webkit-scrollbar-track {
+  background: transparent;
+}
+.menu-notice-points::-webkit-scrollbar-thumb {
+  background: rgba(122, 80, 48, 0.3);
+  border-radius: 3px;
+}
+.menu-notice-points::-webkit-scrollbar-thumb:hover {
+  background: rgba(122, 80, 48, 0.5);
 }
 
 .menu-notice-point {
@@ -2819,6 +2887,13 @@ a, p, span, div {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  /* Footer never shrinks and stays at the bottom of the modal flex column.
+     This means the Close + I Understand buttons are ALWAYS visible,
+     no matter how long the scrollable points list is. */
+  flex: 0 0 auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
 }
 
 .menu-notice-btn-secondary {
@@ -2868,6 +2943,8 @@ a, p, span, div {
   font-size: 0.92rem;
   line-height: 1.6;
   text-align: center;
+  /* Allow growth in flex column so text is never cut off */
+  flex: 0 1 auto;
 }
 
 /* =============================================================
@@ -3314,19 +3391,62 @@ a, p, span, div {
     font-size: 0.74rem;
     padding: 7px 14px;
   }
+  /* Menu Notice Modal — mobile responsive */
   .menu-notice-modal {
-    padding: 24px 18px 18px;
+    padding: 24px 18px 14px;
+    /* On mobile, stick modal to top so user can scroll content naturally.
+       align-items: flex-start on overlay achieves this. */
+    max-height: 94vh;
+    max-height: 94dvh;
+    border-radius: 14px;
+  }
+  .menu-notice-overlay {
+    align-items: flex-start;
+    padding: 12px;
+  }
+  .menu-notice-header {
+    margin-bottom: 16px;
+    padding-right: 32px; /* room for X close button */
+  }
+  .menu-notice-icon {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
   }
   .menu-notice-header h2 { font-size: 1.15rem; }
+  .menu-notice-subtitle { font-size: 0.8rem; }
+  .menu-notice-points {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
   .menu-notice-point {
     padding: 10px 12px;
   }
+  .menu-notice-point-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.78rem;
+  }
+  .menu-notice-point-body strong { font-size: 0.84rem; }
+  .menu-notice-point-body span { font-size: 0.74rem; }
   .menu-notice-footer {
     flex-direction: column-reverse;
+    gap: 8px;
+    padding-top: 10px;
   }
   .menu-notice-btn-secondary,
   .menu-notice-btn-primary {
     width: 100%;
+    /* Touch-friendly: min 44px height per Apple/Google guidelines */
+    min-height: 44px;
+    padding: 11px 18px;
+    font-size: 0.9rem;
+  }
+  .menu-notice-close-x {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+    top: 10px;
+    right: 10px;
   }
   .cart-drawer {
     width: 100%;
@@ -3349,6 +3469,100 @@ a, p, span, div {
     bottom: 80px;
     right: 16px;
     font-size: 1.1rem;
+  }
+}
+
+/* Very small phones — compact layout, smaller text */
+@media (max-width: 380px) {
+  .menu-notice-modal {
+    padding: 20px 14px 12px;
+    max-height: 96vh;
+    max-height: 96dvh;
+    border-radius: 12px;
+  }
+  .menu-notice-overlay {
+    padding: 8px;
+  }
+  .menu-notice-header {
+    margin-bottom: 12px;
+    padding-right: 28px;
+  }
+  .menu-notice-icon {
+    font-size: 1.9rem;
+    margin-bottom: 6px;
+  }
+  .menu-notice-header h2 { font-size: 1.02rem; }
+  .menu-notice-subtitle { font-size: 0.74rem; }
+  .menu-notice-points {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .menu-notice-point {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+  .menu-notice-point-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 0.72rem;
+  }
+  .menu-notice-point-body strong { font-size: 0.78rem; }
+  .menu-notice-point-body span { font-size: 0.7rem; line-height: 1.45; }
+  .menu-notice-btn-secondary,
+  .menu-notice-btn-primary {
+    padding: 10px 14px;
+    font-size: 0.84rem;
+    min-height: 42px;
+  }
+  .menu-notice-close-x {
+    width: 30px;
+    height: 30px;
+    font-size: 0.84rem;
+    top: 8px;
+    right: 8px;
+  }
+}
+
+/* Landscape phones — short height, must constrain modal */
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu-notice-overlay {
+    align-items: flex-start;
+    padding: 8px;
+  }
+  .menu-notice-modal {
+    max-height: 96vh;
+    max-height: 96dvh;
+    padding: 16px 18px 10px;
+  }
+  .menu-notice-header {
+    margin-bottom: 8px;
+    padding-right: 32px;
+  }
+  .menu-notice-icon {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+  }
+  .menu-notice-header h2 { font-size: 1rem; }
+  .menu-notice-subtitle { font-size: 0.74rem; }
+  .menu-notice-points {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .menu-notice-point {
+    padding: 6px 10px;
+  }
+  .menu-notice-footer {
+    padding-top: 8px;
+    flex-direction: row; /* horizontal on landscape to save vertical space */
+    gap: 8px;
+  }
+  .menu-notice-btn-secondary,
+  .menu-notice-btn-primary {
+    flex: 1;
+    width: auto;
+    padding: 8px 12px;
+    min-height: 38px;
+    font-size: 0.82rem;
   }
 }
 

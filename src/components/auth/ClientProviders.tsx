@@ -4,6 +4,7 @@ import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import { CartProvider } from '@/components/cart/CartProvider'
+import ToastCenter from '@/components/ui-custom/ToastCenter'
 import { isSupabaseConfigured, createClient } from '@/lib/supabase/client-browser'
 
 function EmailVerifiedBanner() {
@@ -115,6 +116,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
             <EmailVerifiedBanner />
           </Suspense>
           {children}
+          <ToastCenter />
         </HashFragmentHandler>
       </CartProvider>
     </AuthProvider>

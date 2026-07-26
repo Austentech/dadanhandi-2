@@ -2715,6 +2715,249 @@ a, p, span, div {
 }
 
 /* =============================================================
+   TOAST ALERT CENTER (global popup notifications)
+   -------------------------------------------------------------
+   Renders centered, auto-dismissing alert popups.
+   Used for: Add-to-Plate errors, cart errors, login prompts, etc.
+   Auto-closes after 5s; manual X close; pauses on hover.
+   ============================================================= */
+.toast-center-overlay {
+  position: fixed;
+  /* Center horizontally; position vertically a bit above center
+     so it's in the natural eye-line on most devices. */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10500; /* Above cart drawer (10001), below menu-notice (10000) conflict avoided */
+  pointer-events: none; /* let clicks pass through to underlying UI except on the toast itself */
+  width: 100%;
+  max-width: 100vw;
+  display: flex;
+  justify-content: center;
+  /* Do NOT set height here — let it be auto so it doesn't block clicks */
+}
+
+.toast-center-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+  padding: 16px;
+  /* Re-enable pointer events on the stack so the toast body is clickable */
+  pointer-events: auto;
+}
+
+.toast-alert {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 14px 16px 14px 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  cursor: pointer;
+  font-family: var(--font-nunito), sans-serif;
+  animation: toast-pop-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Ensure long messages wrap and never cause horizontal overflow */
+  word-break: break-word;
+  overflow-wrap: break-word;
+  /* Prevent text selection on rapid click */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes toast-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(-10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes toast-progress-shrink {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.toast-alert-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 12px 0 0 12px;
+}
+
+.toast-alert-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.toast-alert-body {
+  flex: 1 1 auto;
+  min-width: 0; /* allow flex item to shrink so text wraps */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 1px;
+}
+
+.toast-alert-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.toast-alert-message {
+  font-size: 0.84rem;
+  color: #4b5563;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.toast-alert-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toast-alert-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.toast-alert-close:focus-visible {
+  outline: 2px solid var(--clay-orange);
+  outline-offset: 2px;
+}
+
+.toast-alert-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  opacity: 0.85;
+}
+
+/* ---- TOAST RESPONSIVE: MOBILE ---- */
+@media (max-width: 575px) {
+  .toast-center-stack {
+    max-width: 100%;
+    padding: 12px;
+    gap: 8px;
+  }
+  .toast-alert {
+    padding: 12px 14px 12px 16px;
+    gap: 10px;
+    border-radius: 10px;
+  }
+  .toast-alert-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+  .toast-alert-title {
+    font-size: 0.88rem;
+  }
+  .toast-alert-message {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+  .toast-alert-close {
+    width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ---- TOAST RESPONSIVE: VERY SMALL PHONES ---- */
+@media (max-width: 380px) {
+  .toast-center-stack {
+    padding: 8px;
+  }
+  .toast-alert {
+    padding: 10px 12px 10px 14px;
+    gap: 8px;
+  }
+  .toast-alert-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 0.92rem;
+  }
+  .toast-alert-title {
+    font-size: 0.82rem;
+  }
+  .toast-alert-message {
+    font-size: 0.74rem;
+    line-height: 1.4;
+  }
+  .toast-alert-close {
+    width: 24px;
+    height: 24px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ---- TOAST RESPONSIVE: LANDSCAPE PHONES (short height) ---- */
+/* Move toasts to top of screen so they don't get cut off by address bar */
+@media (max-height: 500px) and (orientation: landscape) {
+  .toast-center-overlay {
+    top: 16px;
+    transform: translate(-50%, 0);
+    align-items: flex-start;
+  }
+  .toast-center-stack {
+    max-width: 480px;
+    padding: 8px;
+  }
+  .toast-alert {
+    padding: 10px 12px 10px 14px;
+  }
+  .toast-alert-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.92rem;
+  }
+  .toast-alert-title {
+    font-size: 0.82rem;
+  }
+  .toast-alert-message {
+    font-size: 0.74rem;
+    line-height: 1.4;
+  }
+}
+
+/* =============================================================
    MENU NOTICE MODAL & LOGIN PROMPT
    ============================================================= */
 .menu-notice-overlay {

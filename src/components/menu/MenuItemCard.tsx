@@ -18,6 +18,7 @@ import type { MenuItem, MenuItemVariant } from '@/types/menu'
 import { calculateUnitPrice, formatPrice, formatPricePerUnit } from '@/lib/pricing'
 import { useAuth } from '@/hooks/use-auth'
 import { useCartStore } from '@/store/cart-store'
+import { useToastStore } from '@/store/toast-store'
 import LoginPromptModal from '@/components/cart/LoginPromptModal'
 
 interface MenuItemCardProps {
@@ -27,9 +28,9 @@ interface MenuItemCardProps {
 export default function MenuItemCard({ item }: MenuItemCardProps) {
   const { isAuthenticated } = useAuth()
   const { addItem, isLoading } = useCartStore()
+  const pushToast = useToastStore((s) => s.pushToast)
   const [selectedVariantId, setSelectedVariantId] = useState(item.variants[0]?.id || '')
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
-  const [flashMessage, setFlashMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const selectedVariant: MenuItemVariant | undefined = useMemo(
     () => item.variants.find((v) => v.id === selectedVariantId),
@@ -48,15 +49,19 @@ export default function MenuItemCard({ item }: MenuItemCardProps) {
   }, [item.type, selectedVariant, unitPricePaise])
 
   const handleAddToPlate = async () => {
-    // Clear previous flash
-    setFlashMessage(null)
-
     if (!isAuthenticated) {
       setShowLoginPrompt(true)
       return
     }
 
-    if (!selectedVariant) return
+    if (!selectedVariant) {
+      pushToast({
+        type: 'error',
+        title: 'No variant selected',
+        message: 'Please select a weight or piece option first.',
+      })
+      return
+    }
 
     const result = await addItem({
       itemId: item.id,
@@ -65,13 +70,19 @@ export default function MenuItemCard({ item }: MenuItemCardProps) {
     })
 
     if (result.success) {
-      setFlashMessage({ type: 'success', text: '✓ Added to your plate' })
+      pushToast({
+        type: 'success',
+        title: 'Added to your plate',
+        message: `${item.name} (${selectedVariant.label}) has been added.`,
+      })
     } else {
-      setFlashMessage({ type: 'error', text: result.message })
+      // Show error in centered toast popup — easy to see on every device.
+      pushToast({
+        type: 'error',
+        title: 'Could not add item',
+        message: result.message || 'Please try again in a moment.',
+      })
     }
-
-    // Auto-clear flash after 2.5s
-    setTimeout(() => setFlashMessage(null), 2500)
   }
 
   const isWeight = item.type === 'weight'
@@ -110,12 +121,8 @@ export default function MenuItemCard({ item }: MenuItemCardProps) {
           </div>
         )}
 
-        {/* Flash message (success/error) */}
-        {flashMessage && (
-          <div className={`menu-item-flash menu-item-flash-${flashMessage.type}`}>
-            {flashMessage.text}
-          </div>
-        )}
+        {/* Success/error feedback now shown as centered toast popup
+            via the global ToastCenter (see ClientProviders). */}
       </div>
 
       <div className="menu-item-right menu-item-right-v2">

@@ -74,16 +74,29 @@ export default function MenuNoticeModal() {
   const primaryBtnRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     try {
       const ack = window[STORAGE_TYPE].getItem(STORAGE_KEY)
       if (!ack) {
         // Small delay so it appears after page settles
-        const t = setTimeout(() => setShow(true), 400)
-        return () => clearTimeout(t)
+        const t = setTimeout(() => {
+          if (!cancelled) setShow(true)
+        }, 400)
+        return () => {
+          cancelled = true
+          clearTimeout(t)
+        }
       }
     } catch {
-      // Storage may be disabled — show modal anyway
-      setShow(true)
+      // Storage may be disabled — show modal anyway (deferred to avoid
+      // setState-in-effect lint warning)
+      const t = setTimeout(() => {
+        if (!cancelled) setShow(true)
+      }, 400)
+      return () => {
+        cancelled = true
+        clearTimeout(t)
+      }
     }
   }, [])
 

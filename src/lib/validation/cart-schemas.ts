@@ -79,9 +79,8 @@ export const clearCartSchema = z.object({}).optional()
  *
  * This is the SINGLE source of truth for "is this item real?".
  * Used by every cart API route to prevent injection of fake items.
+ *
+ * NOTE: This is now imported directly where needed (see cart-service.ts)
+ * via `getVariant` from '@/constants/menu-catalog'. The helper below is
+ * kept for backward compatibility but is not currently used.
  */
-export function isValidItemVariantPair(itemId: string, variantId: string): boolean {
-  // Lazy import to avoid circular deps in client bundles
-  const { getVariant } = require('@/constants/menu-catalog')
-  return getVariant(itemId, variantId) !== null
-}

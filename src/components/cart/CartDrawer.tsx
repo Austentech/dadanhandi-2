@@ -24,6 +24,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCartStore } from '@/store/cart-store'
 import { calculateLineBreakdown, formatWeightLabel } from '@/lib/pricing'
 import type { CartItem } from '@/types/menu'
@@ -76,6 +77,14 @@ function getVariantBreakdownDisplay(item: CartItem): string {
 
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, totals, updateQuantity, removeItem, clear, isLoading, updatingLineKey } = useCartStore()
+  const router = useRouter()
+
+  // Navigate to checkout (closes the drawer first for clean UX)
+  const handleCheckout = useCallback(() => {
+    onClose()
+    // Use a microtask delay so the drawer closes before navigation
+    setTimeout(() => router.push('/checkout'), 50)
+  }, [onClose, router])
 
   // Esc to close
   useEffect(() => {
@@ -254,8 +263,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <button
                 type="button"
                 className="cart-checkout-btn"
-                disabled
-                title="Checkout will be available in the next module"
+                onClick={handleCheckout}
+                title="Proceed to checkout"
               >
                 <i className="fas fa-arrow-right" style={{ marginRight: 6 }}></i>
                 Continue to Checkout

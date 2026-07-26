@@ -231,3 +231,25 @@ Stage Summary:
 - 0 lint errors, dev server compiles cleanly, /checkout page renders correctly
 - Documentation: 3 comprehensive docs files (Stripe setup, API reference, testing checklist)
 - Future-ready: orders table reserves pickup_pin and admin_assigned_to columns for later modules
+
+---
+Task ID: M3-TESTING-GUIDE
+Agent: Main Agent
+Task: Create comprehensive Vercel-only testing & deployment guide for the user's GitHub → Vercel → Test workflow (first time setting up a payment gateway, no local dev)
+
+Work Log:
+- Read existing STRIPE_SETUP.md, CHECKOUT_TESTING.md, webhook route, payment-service.ts, checkout config route, .env.local.example
+- Identified gap: existing docs assume LOCAL dev with Stripe CLI (`stripe listen --forward-to localhost:3000`), but user pushes to GitHub → Vercel auto-deploys → tests on Vercel URL only
+- Created comprehensive new doc: docs/VERCEL_TESTING_GUIDE.md (~700 lines) tailored for no-local-dev workflow
+- Guide covers 8 phases: Stripe account setup → Supabase DB setup → Vercel project setup & env vars → First deploy & sanity check → Stripe webhook configuration (using Vercel URL) → Full end-to-end testing (with test cards) → Debugging & monitoring → Going live (production)
+- Included detailed troubleshooting section for common issues (webhook 400, signature fail, UPI not showing, etc.)
+- Included quick-reference cheatsheet with all env vars, test cards, dashboard URLs
+- Included final pre-launch checklist (Stripe/Vercel/Supabase/Code/Functional tests)
+- Added pointer notes at top of existing STRIPE_SETUP.md and CHECKOUT_TESTING.md directing Vercel-only users to the new guide
+
+Stage Summary:
+- New file: docs/VERCEL_TESTING_GUIDE.md (PRIMARY guide for the user's workflow)
+- Existing STRIPE_SETUP.md still useful for reference, but has a pointer at the top
+- Existing CHECKOUT_TESTING.md still useful for test CASES, with pointer to Vercel guide for WORKFLOW
+- User can now follow a single, end-to-end guide that matches their actual workflow (no localhost, no Stripe CLI)
+- Key insight documented: "Send test webhook" button in Stripe Dashboard sends a generic test event with fake PI ID — useful for verifying endpoint reachability, but real flow must be tested by doing actual test payments via the UI

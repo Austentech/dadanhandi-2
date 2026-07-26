@@ -2,6 +2,16 @@
 
 Manual test cases for the Phase 2 Module 3 Checkout & Payment system. Work through each test case before declaring the module production-ready.
 
+> ⚠️ **If you do NOT run code locally (GitHub → Vercel → Test workflow):**
+>
+> Use **`docs/VERCEL_TESTING_GUIDE.md`** as your PRIMARY guide. It contains:
+> - How to test on Vercel preview deploys (no `localhost`)
+> - How to set up Stripe webhooks pointing to your Vercel URL (no Stripe CLI)
+> - How to debug via Vercel function logs
+> - A complete "going live" checklist for production
+>
+> This document covers the test CASES (what to verify). The Vercel guide covers the test WORKFLOW (how to run them on Vercel).
+
 > **Prerequisites**
 > - Stripe CLI running: `stripe listen --forward-to http://localhost:3000/api/stripe/webhook`
 > - Test cards available: <https://stripe.com/docs/testing>

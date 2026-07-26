@@ -157,6 +157,20 @@ function ToastCard({ toast: t }: { toast: ToastItem }) {
           {t.title}
         </strong>
         {t.message && <span className="toast-alert-message">{t.message}</span>}
+        {t.actionLabel && t.onAction && (
+          <button
+            type="button"
+            className="toast-alert-action"
+            onClick={(e) => {
+              e.stopPropagation()
+              t.onAction?.()
+              handleDismiss()
+            }}
+            style={{ background: cfg.accent }}
+          >
+            {t.actionLabel}
+          </button>
+        )}
       </div>
 
       {/* X close button */}

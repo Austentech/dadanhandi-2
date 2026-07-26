@@ -6,14 +6,24 @@
  * Use `pushToast` from anywhere in the app to show a centered, auto-dismissing
  * alert popup. The popup:
  *   - Renders in the center of the viewport on every device
- *   - Auto-closes after 5 seconds
+ *   - Auto-closes after 5 seconds (configurable)
  *   - Has a manual X close button (user can dismiss early)
  *   - Stacks vertically if multiple toasts are active
+ *   - Optional action button (e.g. "Login" on a login-required toast)
  *
  * Usage:
  *   import { useToastStore } from '@/store/toast-store'
  *   const { pushToast } = useToastStore()
- *   pushToast({ type: 'error', title: 'Login Required', message: 'Please log in to add items.' })
+ *   pushToast({ type: 'error', title: 'Login Required', message: 'Please log in.' })
+ *
+ * With action button:
+ *   pushToast({
+ *     type: 'warning',
+ *     title: 'Login Required',
+ *     message: 'Please log in to add items.',
+ *     actionLabel: 'Login',
+ *     onAction: () => openAuthModal('login'),
+ *   })
  *
  * OR use the helper (recommended — does not require hook):
  *   import { toast } from '@/store/toast-store'
@@ -35,6 +45,9 @@ export interface ToastItem {
   message?: string
   durationMs: number  // 0 = no auto-close
   createdAt: number
+  // Optional action button (e.g. "Login" button on login-required toast)
+  actionLabel?: string
+  onAction?: () => void
 }
 
 interface ToastState {
@@ -45,6 +58,8 @@ interface ToastState {
     title: string
     message?: string
     durationMs?: number  // default 5000
+    actionLabel?: string
+    onAction?: () => void
   }) => string  // returns id
 
   removeToast: (id: string) => void
@@ -64,7 +79,7 @@ function genId(): string {
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
 
-  pushToast: ({ type, title, message, durationMs = DEFAULT_DURATION }) => {
+  pushToast: ({ type, title, message, durationMs = DEFAULT_DURATION, actionLabel, onAction }) => {
     const id = genId()
     const item: ToastItem = {
       id,
@@ -73,6 +88,8 @@ export const useToastStore = create<ToastState>((set) => ({
       message,
       durationMs,
       createdAt: Date.now(),
+      actionLabel,
+      onAction,
     }
     set((state) => ({ toasts: [...state.toasts, item] }))
     return id

@@ -25,15 +25,57 @@
 
 import { useEffect, useCallback } from 'react'
 import { useCartStore } from '@/store/cart-store'
-import { calculateLineBreakdown } from '@/lib/pricing'
+import { calculateLineBreakdown, formatWeightLabel } from '@/lib/pricing'
+import type { CartItem } from '@/types/menu'
 
 interface CartDrawerProps {
   isOpen: boolean
   onClose: () => void
 }
 
+/**
+ * Compute the "quantity display" for a cart line.
+ *
+ * For WEIGHT items: shows total weight = variantWeight × quantity.
+ *   e.g. variantLabel="250 gm", quantity=2 → "500 gm"
+ *   e.g. variantLabel="1 kg", quantity=3 → "3 kg"
+ *
+ * For PIECE items: shows total pieces = pieceCount × quantity.
+ *   e.g. variantLabel="4 pcs", quantity=2 → "8 pcs"
+ *
+ * For FIXED items: shows just the quantity number.
+ *   e.g. quantity=2 → "2"
+ *
+ * This addresses user request: when they increase quantity of a 250gm item
+ * from 1 to 2, the display should update to show "500 gm" (not stay at "250 gm").
+ */
+function getQuantityDisplay(item: CartItem): string {
+  if (item.itemType === 'weight' && item.weightGrams) {
+    const totalGrams = item.weightGrams * item.quantity
+    return formatWeightLabel(totalGrams)
+  }
+  if (item.itemType === 'piece' && item.pieceCount) {
+    const totalPieces = item.pieceCount * item.quantity
+    return `${totalPieces} pcs`
+  }
+  return String(item.quantity)
+}
+
+/**
+ * For weight/piece items, also show the per-variant label so user can see
+ * the breakdown: "500 gm (2 × 250 gm)" or "8 pcs (2 × 4 pcs)".
+ * For fixed items, returns empty string.
+ */
+function getVariantBreakdownDisplay(item: CartItem): string {
+  if (item.quantity <= 1) return ''
+  if (item.itemType === 'weight' || item.itemType === 'piece') {
+    return ` (${item.quantity} × ${item.variantLabel})`
+  }
+  return ''
+}
+
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
-  const { items, totals, updateQuantity, removeItem, clear, isLoading } = useCartStore()
+  const { items, totals, updateQuantity, removeItem, clear, isLoading, updatingLineKey } = useCartStore()
 
   // Esc to close
   useEffect(() => {
@@ -119,12 +161,22 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             <div className="cart-drawer-items">
               {items.map((item) => {
                 const breakdown = calculateLineBreakdown(item)
+                const qtyDisplay = getQuantityDisplay(item)
+                const variantBreakdown = getVariantBreakdownDisplay(item)
+                const isThisLineUpdating = updatingLineKey === item.lineKey
                 return (
                   <div key={item.lineKey} className="cart-item">
                     <div className="cart-item-emoji">{item.itemEmoji}</div>
                     <div className="cart-item-body">
                       <div className="cart-item-name">{item.itemName}</div>
-                      <div className="cart-item-variant">{item.variantLabel}</div>
+                      {/* Variant label — for weight/piece items, shows TOTAL
+                          weight/pieces (e.g. "500 gm") when quantity > 1,
+                          plus a breakdown " (2 × 250 gm)" so user understands. */}
+                      <div className="cart-item-variant">
+                        {item.itemType === 'weight' || item.itemType === 'piece'
+                          ? (item.quantity > 1 ? `${qtyDisplay}${variantBreakdown}` : item.variantLabel)
+                          : item.variantLabel}
+                      </div>
                       <div className="cart-item-price-row">
                         <span className="cart-item-unit-price">
                           {breakdown.unitPriceDisplay}
@@ -134,23 +186,31 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         </span>
                       </div>
 
-                      {/* Qty stepper */}
+                      {/* Qty stepper — per-line loading state via updatingLineKey.
+                          For weight/piece items, the qty number shows total
+                          weight/pieces (e.g. "500 gm") instead of just "2". */}
                       <div className="cart-item-stepper">
                         <button
                           type="button"
                           className="cart-stepper-btn"
                           onClick={() => handleQtyChange(item.lineKey, item.quantity, -1)}
-                          disabled={isLoading}
+                          disabled={isThisLineUpdating}
                           aria-label={`Decrease quantity of ${item.itemName}`}
                         >
                           <i className="fas fa-minus"></i>
                         </button>
-                        <span className="cart-stepper-qty" aria-live="polite">{item.quantity}</span>
+                        <span className="cart-stepper-qty" aria-live="polite">
+                          {isThisLineUpdating ? (
+                            <span className="auth-spinner" style={{ width: 14, height: 14 }}></span>
+                          ) : (
+                            qtyDisplay
+                          )}
+                        </span>
                         <button
                           type="button"
                           className="cart-stepper-btn"
                           onClick={() => handleQtyChange(item.lineKey, item.quantity, 1)}
-                          disabled={isLoading}
+                          disabled={isThisLineUpdating}
                           aria-label={`Increase quantity of ${item.itemName}`}
                         >
                           <i className="fas fa-plus"></i>
@@ -164,7 +224,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         type="button"
                         className="cart-item-remove"
                         onClick={() => removeItem({ lineKey: item.lineKey })}
-                        disabled={isLoading}
+                        disabled={isThisLineUpdating}
                         aria-label={`Remove ${item.itemName} from plate`}
                       >
                         <i className="fas fa-trash-alt"></i>

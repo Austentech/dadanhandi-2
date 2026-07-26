@@ -28,9 +28,21 @@ interface CartState {
   // State
   items: CartItem[]
   totals: CartTotals
-  isLoading: boolean  // true while a server op is in-flight
+  isLoading: boolean  // true while a server op is in-flight (any op)
   isInitialized: boolean  // true after first server fetch completed
   lastError: string | null
+  /**
+   * Per-item loading state for "Add to Plate" buttons.
+   * Stores the `${itemId}--${variantId}` line key being added so ONLY that
+   * specific button shows a spinner — not every Add button on the menu.
+   * Null when no add is in-flight.
+   */
+  addingLineKey: string | null
+  /**
+   * Per-line loading state for cart drawer operations (qty +/-, remove).
+   * Stores the lineKey currently being updated/removed.
+   */
+  updatingLineKey: string | null
 
   // Actions
   initFromServer: () => Promise<void>
@@ -62,6 +74,8 @@ export const useCartStore = create<CartState>((set, get) => ({
   isLoading: false,
   isInitialized: false,
   lastError: null,
+  addingLineKey: null,
+  updatingLineKey: null,
 
   // --------------------------------------------------------------------------
   // INIT FROM SERVER
@@ -83,6 +97,8 @@ export const useCartStore = create<CartState>((set, get) => ({
           isLoading: false,
           isInitialized: true,
           lastError: null,
+          addingLineKey: null,
+          updatingLineKey: null,
         })
       } else {
         // Not authenticated — empty cart
@@ -92,6 +108,8 @@ export const useCartStore = create<CartState>((set, get) => ({
           isLoading: false,
           isInitialized: true,
           lastError: null,
+          addingLineKey: null,
+          updatingLineKey: null,
         })
       }
     } catch {
@@ -101,6 +119,8 @@ export const useCartStore = create<CartState>((set, get) => ({
         isLoading: false,
         isInitialized: true,
         lastError: 'Failed to load cart. Please refresh.',
+        addingLineKey: null,
+        updatingLineKey: null,
       })
     }
   },
@@ -109,7 +129,9 @@ export const useCartStore = create<CartState>((set, get) => ({
   // ADD ITEM
   // --------------------------------------------------------------------------
   addItem: async (req) => {
-    set({ isLoading: true, lastError: null })
+    // Per-item loading: only this item's button shows spinner
+    const lineKey = `${req.itemId}--${req.variantId}`
+    set({ isLoading: true, addingLineKey: lineKey, lastError: null })
 
     try {
       const res = await fetch('/api/cart/add', {
@@ -122,14 +144,14 @@ export const useCartStore = create<CartState>((set, get) => ({
       if (data.success && data.data) {
         const items = data.data.cart as CartItem[]
         const totals = data.data.totals as CartTotals
-        set({ items, totals, isLoading: false })
+        set({ items, totals, isLoading: false, addingLineKey: null })
         return { success: true, message: data.message || 'Added to plate.' }
       }
 
-      set({ isLoading: false, lastError: data.message })
+      set({ isLoading: false, addingLineKey: null, lastError: data.message })
       return { success: false, message: data.message || 'Failed to add item.' }
     } catch {
-      set({ isLoading: false, lastError: 'Network error.' })
+      set({ isLoading: false, addingLineKey: null, lastError: 'Network error.' })
       return { success: false, message: 'Network error. Please try again.' }
     }
   },
@@ -143,7 +165,11 @@ export const useCartStore = create<CartState>((set, get) => ({
     const optimisticItems = prevItems.map((it) =>
       it.lineKey === req.lineKey ? { ...it, quantity: req.quantity } : it,
     )
-    set({ items: optimisticItems, totals: calculateCartTotals(optimisticItems) })
+    set({
+      items: optimisticItems,
+      totals: calculateCartTotals(optimisticItems),
+      updatingLineKey: req.lineKey,
+    })
 
     try {
       const res = await fetch('/api/cart/update', {
@@ -156,16 +182,28 @@ export const useCartStore = create<CartState>((set, get) => ({
       if (data.success && data.data) {
         const items = data.data.cart as CartItem[]
         const totals = data.data.totals as CartTotals
-        set({ items, totals, isLoading: false, lastError: null })
+        set({ items, totals, isLoading: false, updatingLineKey: null, lastError: null })
         return { success: true, message: data.message }
       }
 
       // Rollback
-      set({ items: prevItems, totals: calculateCartTotals(prevItems), isLoading: false, lastError: data.message })
+      set({
+        items: prevItems,
+        totals: calculateCartTotals(prevItems),
+        isLoading: false,
+        updatingLineKey: null,
+        lastError: data.message,
+      })
       return { success: false, message: data.message || 'Failed to update quantity.' }
     } catch {
       // Rollback
-      set({ items: prevItems, totals: calculateCartTotals(prevItems), isLoading: false, lastError: 'Network error.' })
+      set({
+        items: prevItems,
+        totals: calculateCartTotals(prevItems),
+        isLoading: false,
+        updatingLineKey: null,
+        lastError: 'Network error.',
+      })
       return { success: false, message: 'Network error. Please try again.' }
     }
   },
@@ -176,7 +214,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   removeItem: async (req) => {
     const prevItems = get().items
     const optimisticItems = prevItems.filter((it) => it.lineKey !== req.lineKey)
-    set({ items: optimisticItems, totals: calculateCartTotals(optimisticItems) })
+    set({
+      items: optimisticItems,
+      totals: calculateCartTotals(optimisticItems),
+      updatingLineKey: req.lineKey,
+    })
 
     try {
       const res = await fetch('/api/cart/remove', {
@@ -189,16 +231,28 @@ export const useCartStore = create<CartState>((set, get) => ({
       if (data.success && data.data) {
         const items = data.data.cart as CartItem[]
         const totals = data.data.totals as CartTotals
-        set({ items, totals, isLoading: false, lastError: null })
+        set({ items, totals, isLoading: false, updatingLineKey: null, lastError: null })
         return { success: true, message: data.message }
       }
 
       // Rollback
-      set({ items: prevItems, totals: calculateCartTotals(prevItems), isLoading: false, lastError: data.message })
+      set({
+        items: prevItems,
+        totals: calculateCartTotals(prevItems),
+        isLoading: false,
+        updatingLineKey: null,
+        lastError: data.message,
+      })
       return { success: false, message: data.message || 'Failed to remove item.' }
     } catch {
       // Rollback
-      set({ items: prevItems, totals: calculateCartTotals(prevItems), isLoading: false, lastError: 'Network error.' })
+      set({
+        items: prevItems,
+        totals: calculateCartTotals(prevItems),
+        isLoading: false,
+        updatingLineKey: null,
+        lastError: 'Network error.',
+      })
       return { success: false, message: 'Network error. Please try again.' }
     }
   },
@@ -208,14 +262,14 @@ export const useCartStore = create<CartState>((set, get) => ({
   // --------------------------------------------------------------------------
   clear: async () => {
     const prevItems = get().items
-    set({ items: [], totals: EMPTY_TOTALS })
+    set({ items: [], totals: EMPTY_TOTALS, isLoading: true })
 
     try {
       const res = await fetch('/api/cart/clear', { method: 'POST' })
       const data = await res.json()
 
       if (data.success) {
-        set({ items: [], totals: EMPTY_TOTALS, isLoading: false, lastError: null })
+        set({ items: [], totals: EMPTY_TOTALS, isLoading: false, lastError: null, addingLineKey: null, updatingLineKey: null })
         return { success: true, message: data.message }
       }
 
@@ -239,6 +293,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       isLoading: false,
       isInitialized: false,
       lastError: null,
+      addingLineKey: null,
+      updatingLineKey: null,
     })
   },
 }))

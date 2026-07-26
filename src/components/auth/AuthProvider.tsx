@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback } from 'react'
 import AuthModal from '@/components/auth/AuthModal'
 import UserDrawer from '@/components/auth/UserDrawer'
 import { useAuth } from '@/hooks/use-auth'
+import { useSessionManager } from '@/hooks/use-session-manager'
 import type { AuthModalState, UserDrawerState } from '@/types/auth'
 
 interface AuthContextValue {
@@ -23,6 +24,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     view: 'login',
   })
   const [userDrawerOpen, setUserDrawerOpen] = useState(false)
+
+  // Enforce session lifetime rules:
+  //  - Force sign-out on fresh browser session (fixes "logged in after deploy")
+  //  - Auto sign-out after 30 min of inactivity
+  useSessionManager()
 
   const openAuthModal = useCallback((view: AuthModalState['view'] = 'login', email?: string) => {
     setAuthModalState({ isOpen: true, view, email })

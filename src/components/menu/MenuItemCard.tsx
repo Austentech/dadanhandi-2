@@ -27,7 +27,7 @@ interface MenuItemCardProps {
 
 export default function MenuItemCard({ item }: MenuItemCardProps) {
   const { isAuthenticated } = useAuth()
-  const { addItem, isLoading } = useCartStore()
+  const { addItem, addingLineKey } = useCartStore()
   const pushToast = useToastStore((s) => s.pushToast)
   const [selectedVariantId, setSelectedVariantId] = useState(item.variants[0]?.id || '')
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
@@ -151,15 +151,16 @@ export default function MenuItemCard({ item }: MenuItemCardProps) {
           )}
         </div>
 
-        {/* Add to Plate button */}
+        {/* Add to Plate button — per-item loading state so only THIS item's
+            button shows a spinner when clicked, not every Add button on menu. */}
         <button
           type="button"
           className="btn-add-to-plate"
           onClick={handleAddToPlate}
-          disabled={isLoading || !selectedVariant}
+          disabled={!selectedVariant || addingLineKey === `${item.id}--${selectedVariant?.id}`}
           aria-label={`Add ${item.name} to plate`}
         >
-          {isLoading ? (
+          {addingLineKey === `${item.id}--${selectedVariant?.id}` ? (
             <span className="auth-spinner"></span>
           ) : (
             <i className="fas fa-plus"></i>

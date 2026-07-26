@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { SITE_CONFIG } from "@/constants/site";
+import CartButton from "@/components/cart/CartButton";
 
 export default function FloatingButtons() {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -18,15 +19,8 @@ export default function FloatingButtons() {
 
   return (
     <>
-      <a
-        href={SITE_CONFIG.whatsappOrderLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="floating-whatsapp"
-        aria-label="WhatsApp Order"
-      >
-        <i className="fab fa-whatsapp"></i>
-      </a>
+      {/* Plate / Cart button — replaces WhatsApp order button */}
+      <CartButton />
       <a href={`tel:${SITE_CONFIG.phone}`} className="floating-call" aria-label="Call Now">
         <i className="fas fa-phone"></i>
       </a>

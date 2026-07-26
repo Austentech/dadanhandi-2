@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AuthProvider } from '@/components/auth/AuthProvider'
+import { CartProvider } from '@/components/cart/CartProvider'
 import { isSupabaseConfigured, createClient } from '@/lib/supabase/client-browser'
 
 function EmailVerifiedBanner() {
@@ -108,12 +109,14 @@ function HashFragmentHandler({ children }: { children: React.ReactNode }) {
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <HashFragmentHandler>
-        <Suspense fallback={null}>
-          <EmailVerifiedBanner />
-        </Suspense>
-        {children}
-      </HashFragmentHandler>
+      <CartProvider>
+        <HashFragmentHandler>
+          <Suspense fallback={null}>
+            <EmailVerifiedBanner />
+          </Suspense>
+          {children}
+        </HashFragmentHandler>
+      </CartProvider>
     </AuthProvider>
   )
 }

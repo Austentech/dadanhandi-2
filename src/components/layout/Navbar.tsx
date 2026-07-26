@@ -157,9 +157,9 @@ export default function Navbar() {
               >
                 <i className="fas fa-user" style={{ marginRight: 6 }}></i> Login
               </button>
-              <a href={SITE_CONFIG.whatsappOrderLink} target="_blank" rel="noopener noreferrer" style={{ color: "#25D366", fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
-                <i className="fab fa-whatsapp"></i> Order on WhatsApp
-              </a>
+              <Link href="/menu" style={{ color: "#7A0C0C", fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
+                <i className="fas fa-utensils"></i> Browse Menu & Order
+              </Link>
             </>
           )}
         </div>

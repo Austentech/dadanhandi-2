@@ -71,12 +71,9 @@ export default function HeroSection() {
         <p className="hero-subtitle">Authentic Bihar · Handi Specialist · Danapur, Patna</p>
 
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14, marginTop: 8 }}>
-          <Link href={HERO_CONTENT.cta1.href} className="btn-hero-primary">
-            <i className="fas fa-utensils"></i> Order on Zomato
+          <Link href="/menu" className="btn-hero-primary">
+            <i className="fas fa-book-open"></i> View Menu & Order
           </Link>
-          <a href={HERO_CONTENT.cta2.href} target="_blank" rel="noopener noreferrer" className="btn-hero-whatsapp">
-            <i className="fab fa-whatsapp"></i> WhatsApp Chat
-          </a>
           <a href="tel:8986496574" className="btn-hero-secondary">
             <i className="fas fa-phone"></i> Call Now
           </a>

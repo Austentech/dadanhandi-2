@@ -8,30 +8,28 @@ import PageLoader from "@/components/ui-custom/PageLoader";
 import FloatingButtons from "@/components/ui-custom/FloatingButtons";
 import ScrollReveal from "@/components/ui-custom/ScrollReveal";
 import HungerPopup from "@/components/ui-custom/HungerPopup";
-import { MENU_CATEGORIES, SITE_CONFIG } from "@/constants/content";
+import MenuNoticeModal from "@/components/menu/MenuNoticeModal";
+import MenuItemCard from "@/components/menu/MenuItemCard";
+import { MENU_CATALOG } from "@/constants/menu-catalog";
 
 const FILTER_OPTIONS = [
   { id: "all", label: "All" },
-  ...MENU_CATEGORIES.map((cat) => ({ id: cat.id, label: cat.title.replace(/<[^>]*>/g, "") })),
+  ...MENU_CATALOG.map((cat) => ({ id: cat.id, label: cat.title.replace(/<[^>]*>/g, "") })),
 ];
 
 export default function MenuPage() {
   const [activeFilter, setActiveFilter] = useState("all");
 
   const filteredCategories = activeFilter === "all"
-    ? MENU_CATEGORIES
-    : MENU_CATEGORIES.filter((cat) => cat.id === activeFilter);
-
-  const handleOrderNow = (itemName: string) => {
-    const url = `https://wa.me/${SITE_CONFIG.whatsapp}?text=${encodeURIComponent("Hi! I want to order: " + itemName)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
+    ? MENU_CATALOG
+    : MENU_CATALOG.filter((cat) => cat.id === activeFilter);
 
   return (
     <>
       <PageLoader />
       <Navbar />
       <ScrollReveal />
+      <MenuNoticeModal />
       <main>
         <section className="page-hero">
           <div className="container-custom" style={{ position: "relative" }}>
@@ -41,7 +39,13 @@ export default function MenuPage() {
               <span style={{ color: "#F4C430" }}>Menu</span>
             </nav>
             <h1 className="page-hero-title">Our <span>Menu</span></h1>
-            <p style={{ color: "#7A5030", fontSize: "1rem", marginTop: 10 }}>Authentic Bihar non-veg food, slow-cooked in traditional handi</p>
+            <p style={{ color: "#7A5030", fontSize: "1rem", marginTop: 10 }}>
+              Authentic Bihar non-veg food, slow-cooked in traditional handi
+            </p>
+            <div className="menu-hero-notice">
+              <i className="fas fa-info-circle"></i>
+              <span>Pickup orders only · Pay online · Order ready at store</span>
+            </div>
           </div>
         </section>
 
@@ -69,30 +73,16 @@ export default function MenuPage() {
             </div>
 
             {/* Menu Categories */}
-            {filteredCategories.map((cat, catIdx) => (
+            {filteredCategories.map((cat) => (
               <div key={cat.id} className="menu-section-block" data-cat={cat.id}>
                 <div className="menu-cat-heading">
                   <h3 dangerouslySetInnerHTML={{ __html: cat.title }}></h3>
                   <div className="menu-cat-line"></div>
                 </div>
 
-                {cat.items.map((item, idx) => (
-                  <div key={idx} className="menu-item-card reveal">
-                    <div className="menu-item-img-placeholder">{item.emoji}</div>
-                    <div className="menu-item-body">
-                      <div className="menu-item-name">{item.name}</div>
-                      <p className="menu-item-desc">{item.description}</p>
-                    </div>
-                    <div className="menu-item-right">
-                      <div className="menu-item-price">{item.price}</div>
-                      {item.quantity && <div className="menu-item-qty">{item.quantity}</div>}
-                      <button
-                        className="btn-order-now"
-                        onClick={() => handleOrderNow(item.name)}
-                      >
-                        <i className="fab fa-whatsapp"></i> Order Now
-                      </button>
-                    </div>
+                {cat.items.map((item) => (
+                  <div key={item.id} className="reveal">
+                    <MenuItemCard item={item} />
                   </div>
                 ))}
               </div>

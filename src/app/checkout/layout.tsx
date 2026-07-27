@@ -14,7 +14,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Checkout · Dadan Handi Mutton',
-  description: 'Complete your order securely with pickup time selection, donations, rewards, and Stripe payment.',
+  description: 'Complete your order securely with pickup time selection, donations, rewards, and Razorpay payment.',
   robots: { index: false, follow: false },  // checkout should not be indexed
 }
 

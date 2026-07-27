@@ -156,8 +156,8 @@ create table if not exists public.orders (
   -- Idempotency: prevents duplicate order creation from double-click / refresh
   idempotency_key text not null unique,
 
-  -- Stripe Payment Intent ID (set when payment intent is created)
-  stripe_payment_intent_id text unique,
+  -- Razorpay order_id (set when Razorpay Order is created server-side)
+  razorpay_order_id text unique,
 
   -- Reserved for future modules (no schema changes needed when those ship)
   pickup_pin text,
@@ -184,7 +184,7 @@ create index if not exists idx_orders_user_id on public.orders(user_id);
 create index if not exists idx_orders_order_number on public.orders(order_number);
 create index if not exists idx_orders_payment_status on public.orders(payment_status);
 create index if not exists idx_orders_order_status on public.orders(order_status);
-create index if not exists idx_orders_stripe_pi on public.orders(stripe_payment_intent_id);
+create index if not exists idx_orders_razorpay_order on public.orders(razorpay_order_id);
 create index if not exists idx_orders_branch_date on public.orders(branch_id, pickup_date);
 create index if not exists idx_orders_user_created on public.orders(user_id, created_at desc);
 
@@ -256,9 +256,10 @@ create table if not exists public.payments (
   order_id uuid not null references public.orders(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
 
-  -- Stripe identifiers
-  stripe_payment_intent_id text not null,
-  stripe_charge_id text,
+  -- Razorpay identifiers
+  razorpay_order_id text not null,
+  razorpay_payment_id text,
+  razorpay_signature text,
 
   -- Amount captured / authorized (paise)
   amount_paise integer not null check (amount_paise >= 0),
@@ -292,7 +293,7 @@ create trigger trg_payments_updated_at
 
 create index if not exists idx_payments_order_id on public.payments(order_id);
 create index if not exists idx_payments_user_id on public.payments(user_id);
-create index if not exists idx_payments_stripe_pi on public.payments(stripe_payment_intent_id);
+create index if not exists idx_payments_razorpay_order on public.payments(razorpay_order_id);
 create index if not exists idx_payments_status on public.payments(status);
 
 alter table public.payments enable row level security;
@@ -314,12 +315,12 @@ create policy "payments_update_own"
   using (auth.uid() = user_id);
 
 -- ============================================================================
--- PROCESSED WEBHOOK EVENTS TABLE (idempotency for Stripe webhooks)
+-- PROCESSED WEBHOOK EVENTS TABLE (idempotency for Razorpay webhooks)
 -- ============================================================================
--- Every Stripe event has a unique ID (evt_...). We record it here so that
--- if Stripe retries the same event (or we receive it twice), we skip
--- processing. This is the SINGLE source of truth for "have we handled
--- this event?". Primary key on event_id makes dedup atomic.
+-- Every Razorpay webhook event has a unique payment_id. We record it here so
+-- that if Razorpay retries the same event (or we receive it twice), we skip
+-- processing. This is the SINGLE source of truth for "have we handled this
+-- event?". Primary key on event_id makes dedup atomic.
 create table if not exists public.processed_webhook_events (
   event_id text primary key,
   event_type text not null,
@@ -804,17 +805,17 @@ grant execute on function public.create_draft_order(
 ) to authenticated;
 
 -- ============================================================================
--- RPC: attach_payment_intent_to_order
+-- RPC: attach_razorpay_order_to_order
 -- ----------------------------------------------------------------------------
--- Links a Stripe PaymentIntent ID to a draft order and transitions the
+-- Links a Razorpay order_id to a draft order and transitions the
 -- order to 'awaiting_payment' status. Also creates the payments row.
--- Idempotent: if called twice with same PI ID, returns success without
--- creating duplicates.
+-- Idempotent: if called twice with same Razorpay order_id, returns success
+-- without creating duplicates.
 -- ============================================================================
-create or replace function public.attach_payment_intent_to_order(
+create or replace function public.attach_razorpay_order_to_order(
   p_order_id uuid,
   p_user_id uuid,
-  p_stripe_payment_intent_id text,
+  p_razorpay_order_id text,
   p_amount_paise integer
 )
 returns jsonb
@@ -823,11 +824,11 @@ security definer
 set search_path = public
 as $$
 declare
-  v_existing_pi text;
+  v_existing_rzp text;
   v_payment_id uuid;
 begin
   -- Lock the order row
-  select stripe_payment_intent_id into v_existing_pi
+  select razorpay_order_id into v_existing_rzp
   from public.orders
   where id = p_order_id and user_id = p_user_id
   for update;
@@ -836,33 +837,33 @@ begin
     return jsonb_build_object('success', false, 'message', 'Order not found');
   end if;
 
-  -- If already attached to a different PI, reject
-  if v_existing_pi is not null and v_existing_pi <> p_stripe_payment_intent_id then
+  -- If already attached to a different Razorpay order, reject
+  if v_existing_rzp is not null and v_existing_rzp <> p_razorpay_order_id then
     return jsonb_build_object('success', false, 'message', 'Order already has a different payment intent');
   end if;
 
   -- Update order to awaiting_payment (if not already)
   update public.orders
   set order_status = case when order_status = 'draft' then 'awaiting_payment' else order_status end,
-      stripe_payment_intent_id = p_stripe_payment_intent_id
+      razorpay_order_id = p_razorpay_order_id
   where id = p_order_id;
 
-  -- Insert payment row (idempotent: if exists for this PI, do nothing)
+  -- Insert payment row (idempotent: if exists for this Razorpay order, do nothing)
   insert into public.payments (
     order_id, user_id,
-    stripe_payment_intent_id, amount_paise, currency, status
+    razorpay_order_id, amount_paise, currency, status
   ) values (
     p_order_id, p_user_id,
-    p_stripe_payment_intent_id, p_amount_paise, 'inr', 'pending'
+    p_razorpay_order_id, p_amount_paise, 'inr', 'pending'
   )
-  on conflict (stripe_payment_intent_id) do nothing
+  on conflict (razorpay_order_id) do nothing
   returning id into v_payment_id;
 
   -- If conflict (existing payment), fetch its id
   if v_payment_id is null then
     select id into v_payment_id
     from public.payments
-    where stripe_payment_intent_id = p_stripe_payment_intent_id
+    where razorpay_order_id = p_razorpay_order_id
     limit 1;
   end if;
 
@@ -874,20 +875,21 @@ begin
 end;
 $$;
 
-grant execute on function public.attach_payment_intent_to_order(
+grant execute on function public.attach_razorpay_order_to_order(
   uuid, uuid, text, integer
 ) to authenticated;
 
 -- ============================================================================
 -- RPC: mark_order_succeeded
 -- ----------------------------------------------------------------------------
--- Called ONLY from the Stripe webhook handler after verified
--- payment_intent.succeeded event.
+-- Called EITHER from:
+--  - /api/checkout/verify-payment (PRIMARY — client verifies signature)
+--  - /api/razorpay/webhook (SECONDARY — resilience if client closes browser)
 --
 -- Atomic operations:
 --   1. Insert into processed_webhook_events (idempotency guard)
 --   2. Update order: payment_status='succeeded', order_status='confirmed'
---   3. Update payment: status='succeeded', stripe_charge_id, raw_payload
+--   3. Update payment: status='succeeded', razorpay_payment_id, razorpay_signature, raw_payload
 --   4. Award reward points (5 if subtotal > ₹500 AND plantation donation)
 --   5. Clear user's cart (delete from cart_items)
 --
@@ -895,7 +897,8 @@ grant execute on function public.attach_payment_intent_to_order(
 -- ============================================================================
 create or replace function public.mark_order_succeeded(
   p_order_id uuid,
-  p_stripe_charge_id text,
+  p_razorpay_payment_id text,
+  p_razorpay_signature text,
   p_webhook_event_id text,
   p_event_type text,
   p_raw_payload jsonb
@@ -938,14 +941,15 @@ begin
   -- Find payment row
   select id into v_payment_id
   from public.payments
-  where stripe_payment_intent_id = v_order.stripe_payment_intent_id
+  where razorpay_order_id = v_order.razorpay_order_id
   limit 1;
 
   -- Update payment record
   if v_payment_id is not null then
     update public.payments
     set status = 'succeeded',
-        stripe_charge_id = p_stripe_charge_id,
+        razorpay_payment_id = p_razorpay_payment_id,
+        razorpay_signature = p_razorpay_signature,
         raw_payload = p_raw_payload,
         webhook_processed_at = now()
     where id = v_payment_id;
@@ -1024,15 +1028,15 @@ $$;
 
 -- NOTE: webhook handler runs as service role (no RLS), so we don't need
 -- to grant execute to authenticated. But we grant to authenticated as well
--- in case the webhook route uses an anon-context client. Safe because the
--- function is purely operational and the order_id/PI_id are unguessable UUIDs.
-grant execute on function public.mark_order_succeeded(uuid, text, text, text, jsonb) to authenticated, anon;
+-- in case the verify-payment route uses an authenticated client. Safe because
+-- the order_id/razorpay IDs are unguessable UUIDs.
+grant execute on function public.mark_order_succeeded(uuid, text, text, text, text, jsonb) to authenticated, anon;
 
 -- ============================================================================
 -- RPC: mark_order_failed
 -- ----------------------------------------------------------------------------
--- Called from Stripe webhook after verified payment_intent.payment_failed
--- event. Restores redeemed reward points if applicable.
+-- Called from verify-payment (signature invalid) or from Razorpay webhook
+-- (payment.failed event). Restores redeemed reward points if applicable.
 -- ============================================================================
 create or replace function public.mark_order_failed(
   p_order_id uuid,
@@ -1077,7 +1081,7 @@ begin
   -- Update payment record
   select id into v_payment_id
   from public.payments
-  where stripe_payment_intent_id = v_order.stripe_payment_intent_id
+  where razorpay_order_id = v_order.razorpay_order_id
   limit 1;
 
   if v_payment_id is not null then
@@ -1176,7 +1180,7 @@ begin
     'reward_points_earned', o.reward_points_earned,
     'payment_status', o.payment_status,
     'order_status', o.order_status,
-    'stripe_payment_intent_id', o.stripe_payment_intent_id,
+    'razorpay_order_id', o.razorpay_order_id,
     'customer_notes', o.customer_notes,
     'created_at', o.created_at,
     'updated_at', o.updated_at

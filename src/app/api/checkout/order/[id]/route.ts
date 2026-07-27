@@ -4,7 +4,7 @@
  * Get the full order (header + items + branch snapshot) for the authenticated user.
  *
  * Used by the confirmation page to poll for payment status. Once the
- * Stripe webhook fires and marks the order as 'confirmed', this endpoint
+ * Razorpay webhook fires and marks the order as 'confirmed', this endpoint
  * returns the updated state and the client stops polling.
  *
  * Security:

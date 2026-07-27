@@ -1,35 +1,41 @@
 /**
- * Step 5 — Payment (Stripe Elements)
- * ----------------------------------
- * Mounts the Stripe Payment Element using the client_secret from the
- * created PaymentIntent. Supports UPI, credit cards, and debit cards
- * (via Stripe India — payment methods enabled in the Stripe dashboard).
+ * Step 5 — Payment (Razorpay Checkout)
+ * ------------------------------------
+ * Loads Razorpay's Checkout.js script and opens the payment modal when
+ * the user clicks "Pay". Supports UPI, credit/debit cards, netbanking,
+ * and wallets (whichever methods are enabled in the Razorpay dashboard).
  *
  * FLOW:
- *  1. On mount: calls createOrder() to create a draft order + PaymentIntent
- *  2. Stores the client_secret + order_id in the checkout store
- *  3. Loads Stripe.js with the publishable key
- *  4. Mounts <Elements> with the client_secret
- *  5. Renders <PaymentElement /> inside the Elements provider
- *  6. User enters payment details and clicks "Pay"
- *  7. Calls stripe.confirmPayment({ elements, redirect: 'if_required' })
- *  8. If success: navigate to confirmation page (webhook will fire async)
- *  9. If failure: show error, allow retry (cart + order preserved)
+ *  1. On mount: calls createOrder() to create a draft order + Razorpay Order
+ *  2. Stores razorpay_order_id + order_id in the checkout store
+ *  3. Loads Razorpay Checkout.js (https://checkout.razorpay.com/v1/checkout.js)
+ *  4. User clicks "Pay ₹X" → opens Razorpay modal
+ *  5. User pays via UPI/card/netbanking
+ *  6. Razorpay returns { razorpay_payment_id, razorpay_order_id, razorpay_signature }
+ *  7. Client calls verifyPayment() → /api/checkout/verify-payment
+ *  8. Server verifies signature → marks order as 'confirmed' → awards points → clears cart
+ *  9. On success: navigate to confirmation page
+ * 10. On failure: show error, allow retry (cart + order preserved)
+ *
+ * RAZORPAY ADVANTAGES OVER STRIPE:
+ *  - No webhook REQUIRED for the happy path (signature verification is enough)
+ *  - UPI is native and well-supported in India
+ *  - Modal-based checkout is faster than embedded form (no client_secret)
+ *  - Indian business onboarding is instant (no invite-only restrictions)
  *
  * IDEMPOTENCY:
  *  - The store generates a single idempotency_key per checkout attempt
- *  - If the user clicks "Pay" twice, the second call is ignored
- *  - If Stripe returns requires_action (3DS), we let Stripe handle it
- *  - The webhook is the SOURCE OF TRUTH for payment status — the client
- *    confirmation just tells us "the form was submitted successfully"
+ *  - If the user clicks "Pay" twice, the second click is ignored
+ *  - The server's create-order endpoint is idempotent via the idempotency_key
+ *  - The verify-payment endpoint is idempotent via the mark_order_succeeded RPC
  */
 
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { loadStripe, type Stripe as StripeJS } from '@stripe/stripe-js'
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useCheckoutStore } from '@/store/checkout-store'
+import { useToastStore } from '@/store/toast-store'
+import { useAuth } from '@/hooks/use-auth'
 import { formatPrice } from '@/lib/pricing'
 
 interface Step5PaymentProps {
@@ -39,156 +45,33 @@ interface Step5PaymentProps {
 }
 
 // ============================================================================
-// STRIPE APPEARANCE — match the Dadan Handi brand
+// RAZORPAY CHECKOUT SCRIPT LOADER
 // ============================================================================
-const stripeAppearance = {
-  theme: 'stripe' as const,
-  variables: {
-    colorPrimary: '#7A0C0C',
-    colorBackground: '#FFFFFF',
-    colorText: '#2C1008',
-    colorDanger: '#C46A2E',
-    colorTextPlaceholder: '#7A5030',
-    fontFamily: 'Nunito, system-ui, sans-serif',
-    borderRadius: '8px',
-    spacingUnit: '6px',
-  },
-  rules: {
-    '.Tab': {
-      borderColor: '#E8C98A',
-      backgroundColor: '#FFF8EE',
-    },
-    '.Tab--selected': {
-      borderColor: '#7A0C0C',
-      backgroundColor: '#FFFFFF',
-    },
-    '.Tab:hover': {
-      borderColor: '#C46A2E',
-    },
-    '.Input': {
-      borderColor: '#E8C98A',
-    },
-    '.Input:focus': {
-      borderColor: '#7A0C0C',
-      boxShadow: '0 0 0 3px rgba(122, 12, 12, 0.12)',
-    },
-  },
-}
+const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js'
 
-// ============================================================================
-// PAYMENT FORM (inside Elements provider)
-// ============================================================================
-function PaymentForm({
-  amountPaise,
-  onSuccess,
-  onFailure,
-}: {
-  amountPaise: number
-  onSuccess: () => void
-  onFailure: (reason: string) => void
-}) {
-  const stripe = useStripe()
-  const elements = useElements()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!stripe || !elements) {
-      setErrorMessage('Payment system is still loading. Please wait a moment.')
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Already loaded?
+    if (typeof window !== 'undefined' && window.Razorpay) {
+      resolve(true)
       return
     }
 
-    setIsProcessing(true)
-    setErrorMessage(null)
-
-    try {
-      // Trigger form validation and submission
-      const { error } = await stripe.confirmPayment({
-        elements,
-        redirect: 'if_required',  // Stay on-page; handle next steps ourselves
-      })
-
-      if (error) {
-        // Stripe returned an error (card declined, invalid input, etc.)
-        // Show the error message to the user. Cart + order are preserved.
-        const msg = error.message || 'Payment failed. Please try again.'
-        setErrorMessage(msg)
-        onFailure(msg)
-        setIsProcessing(false)
-        return
-      }
-
-      // No error — payment intent should be in 'succeeded' or 'processing' state.
-      // The webhook is the source of truth — we don't confirm the order here.
-      // We just navigate to the confirmation page, which polls for status.
-      onSuccess()
-    } catch (err) {
-      const msg = 'Unexpected error during payment. Please try again.'
-      console.error('[STRIPE PAYMENT] confirmPayment error:', err)
-      setErrorMessage(msg)
-      onFailure(msg)
-      setIsProcessing(false)
+    // Already in progress?
+    const existing = document.querySelector(`script[src="${RAZORPAY_SCRIPT_URL}"]`)
+    if (existing) {
+      existing.addEventListener('load', () => resolve(true))
+      existing.addEventListener('error', () => resolve(false))
+      return
     }
-  }
 
-  return (
-    <form onSubmit={handleSubmit} className="payment-section">
-      <div className="payment-elements-wrapper">
-        <PaymentElement
-          options={{
-            layout: {
-              type: 'tabs',
-              defaultCollapsed: false,
-            },
-          }}
-        />
-      </div>
-
-      {errorMessage && (
-        <div className="payment-error-banner" role="alert">
-          <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      <div className="payment-security-note">
-        <i className="fas fa-lock" aria-hidden="true"></i>
-        <span>
-          Your payment is secured by Stripe. We never see or store your card details.
-          UPI, credit & debit cards accepted.
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Amount to pay</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--dark-red)' }}>
-            {formatPrice(amountPaise)}
-          </div>
-        </div>
-        <button
-          type="submit"
-          className="checkout-btn checkout-btn-primary"
-          disabled={!stripe || isProcessing}
-          style={{ minWidth: 180, justifyContent: 'center' }}
-        >
-          {isProcessing ? (
-            <>
-              <span className="payment-loading-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} aria-hidden="true"></span>
-              Processing…
-            </>
-          ) : (
-            <>
-              <i className="fas fa-lock" aria-hidden="true"></i>
-              Pay {formatPrice(amountPaise)}
-            </>
-          )}
-        </button>
-      </div>
-    </form>
-  )
+    const script = document.createElement('script')
+    script.src = RAZORPAY_SCRIPT_URL
+    script.async = true
+    script.onload = () => resolve(!!window.Razorpay)
+    script.onerror = () => resolve(false)
+    document.head.appendChild(script)
+  })
 }
 
 // ============================================================================
@@ -196,41 +79,47 @@ function PaymentForm({
 // ============================================================================
 export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5PaymentProps) {
   const {
-    stripePublishableKey,
+    razorpayKeyId,
     fetchConfig,
     createOrder,
+    verifyPayment,
     isCreatingOrder,
+    isVerifyingPayment,
     orderId,
     orderNumber,
-    clientSecret,
+    razorpayOrderId,
     validatedFinalAmountPaise,
     error,
   } = useCheckoutStore()
+  const { pushToast } = useToastStore()
+  const { user, profile } = useAuth()
 
-  const [stripe, setStripe] = useState<StripeJS | null>(null)
-  const createOrderCalledRef = useRef(false)
+  const [scriptLoaded, setScriptLoaded] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const createOrderCalledRef = useRef(false)
+  const razorpayInstanceRef = useRef<RazorpayInstance | null>(null)
 
-  // Fetch config (publishable key) on mount
+  // Fetch config (Razorpay key_id) on mount
   useEffect(() => {
-    if (!stripePublishableKey) {
+    if (!razorpayKeyId) {
       fetchConfig()
     }
-  }, [stripePublishableKey, fetchConfig])
+  }, [razorpayKeyId, fetchConfig])
 
-  // Load Stripe.js once we have the publishable key
+  // Load Razorpay Checkout.js script
   useEffect(() => {
-    if (!stripePublishableKey) return
+    if (!razorpayKeyId) return
     let cancelled = false
-    loadStripe(stripePublishableKey).then((s) => {
-      if (!cancelled) setStripe(s)
+    loadRazorpayScript().then((ok) => {
+      if (!cancelled) setScriptLoaded(ok)
     })
     return () => {
       cancelled = true
     }
-  }, [stripePublishableKey])
+  }, [razorpayKeyId])
 
-  // Create the draft order + PaymentIntent on mount (once).
+  // Create the draft order + Razorpay Order on mount (once).
   // Uses a ref guard to prevent duplicate calls in StrictMode / re-renders.
   useEffect(() => {
     if (createOrderCalledRef.current) return
@@ -248,38 +137,165 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
     }
   }, [createOrder])
 
-  const handleSuccess = useCallback(() => {
-    if (orderId) {
-      onSuccess(orderId)
+  // Cleanup: destroy Razorpay instance on unmount
+  useEffect(() => {
+    return () => {
+      if (razorpayInstanceRef.current) {
+        try {
+          razorpayInstanceRef.current.close()
+        } catch {
+          // ignore
+        }
+        razorpayInstanceRef.current = null
+      }
     }
-  }, [orderId, onSuccess])
+  }, [])
 
-  const handleFailure = useCallback(
-    (reason: string) => {
-      onFailure(reason)
-    },
-    [onFailure],
-  )
+  // ---------------------------------------------------------------------------
+  // OPEN RAZORPAY CHECKOUT MODAL
+  // ---------------------------------------------------------------------------
+  const handlePay = useCallback(() => {
+    if (!razorpayKeyId) {
+      const msg = 'Payment system is not configured. Please contact support.'
+      setLocalError(msg)
+      onFailure(msg)
+      return
+    }
 
+    if (!scriptLoaded || typeof window === 'undefined' || !window.Razorpay) {
+      const msg = 'Payment system is still loading. Please wait a moment and try again.'
+      setLocalError(msg)
+      return
+    }
+
+    if (!razorpayOrderId || !orderId) {
+      const msg = 'Order is not ready. Please wait a moment.'
+      setLocalError(msg)
+      return
+    }
+
+    const amountPaise = validatedFinalAmountPaise ?? 0
+    if (amountPaise <= 0) {
+      const msg = 'Invalid payment amount.'
+      setLocalError(msg)
+      return
+    }
+
+    setLocalError(null)
+    setIsPaymentModalOpen(true)
+
+    // Pre-fill user info from auth state
+    const prefillEmail = user?.email || ''
+    const prefillContact = profile?.mobile_number || profile?.whatsapp_number || user?.phone || ''
+    const prefillName = profile?.full_name || (user?.user_metadata?.full_name as string) || ''
+
+    // Create the Razorpay instance
+    const rzp = new window.Razorpay({
+      key: razorpayKeyId,
+      order_id: razorpayOrderId,
+      name: 'Dadan Handi Mutton Hotel',
+      description: orderNumber ? `Order ${orderNumber}` : 'Food order payment',
+      image: '/images/brand-logo.png',
+      amount: amountPaise,
+      currency: 'INR',
+      // Razorpay accepts these top-level fields for prefill
+      email: prefillEmail,
+      contact: prefillContact,
+      notes: {
+        internal_order_id: orderId,
+        internal_order_number: orderNumber || '',
+        customer_name: prefillName,
+      },
+      theme: {
+        color: '#7A0C0C',
+      },
+      modal: {
+        ondismiss: () => {
+          setIsPaymentModalOpen(false)
+          // User closed the modal without paying — don't fail, just stay on step 5
+          // so they can retry with the same order
+          pushToast({
+            type: 'info',
+            title: 'Payment cancelled',
+            message: 'You can retry payment by clicking Pay again.',
+            durationMs: 5000,
+          })
+        },
+      },
+      handler: async (response) => {
+        // Razorpay returned: razorpay_payment_id, razorpay_order_id, razorpay_signature
+        setIsPaymentModalOpen(false)
+
+        try {
+          const verifyResult = await verifyPayment({
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpayOrderId: response.razorpay_order_id,
+            razorpaySignature: response.razorpay_signature,
+          })
+
+          if (verifyResult.success) {
+            pushToast({
+              type: 'success',
+              title: 'Payment Successful!',
+              message: 'Your order has been confirmed.',
+              durationMs: 4000,
+            })
+            onSuccess(orderId)
+          } else {
+            // Verification failed — signature mismatch or server error
+            const msg = verifyResult.message || 'Payment verification failed.'
+            setLocalError(msg)
+            onFailure(msg)
+          }
+        } catch (err) {
+          console.error('[RAZORPAY] verifyPayment error:', err)
+          const msg = 'Could not verify payment. Please contact support with your order number.'
+          setLocalError(msg)
+          onFailure(msg)
+        }
+      },
+    })
+
+    // Register failure handler
+    rzp.on('payment.failed', (resp) => {
+      setIsPaymentModalOpen(false)
+      const errorMsg = resp.error?.description || 'Payment failed. Please try again.'
+      setLocalError(errorMsg)
+      onFailure(errorMsg)
+      pushToast({
+        type: 'error',
+        title: 'Payment Failed',
+        message: errorMsg,
+        durationMs: 6000,
+      })
+    })
+
+    razorpayInstanceRef.current = rzp
+
+    // Open the modal
+    rzp.open()
+  }, [
+    razorpayKeyId,
+    scriptLoaded,
+    razorpayOrderId,
+    orderId,
+    orderNumber,
+    validatedFinalAmountPaise,
+    verifyPayment,
+    onSuccess,
+    onFailure,
+    pushToast,
+    user,
+    profile,
+  ])
+
+  // ---------------------------------------------------------------------------
+  // RENDER
+  // ---------------------------------------------------------------------------
   const amountPaise = validatedFinalAmountPaise ?? 0
 
-  // Render states:
-  // 1. Creating order → loading
-  // 2. Order created, no clientSecret yet → loading
-  // 3. Order created + clientSecret + Stripe loaded → render form
-  // 4. Error → error banner with retry option
-
-  const isInitializing = isCreatingOrder || (!clientSecret && !localError && !error)
-  const canRenderForm = !!clientSecret && !!stripe && amountPaise > 0
-
-  // Memoize options to prevent re-renders
-  const elementOptions = useMemo(
-    () => ({
-      clientSecret: clientSecret!,
-      appearance: stripeAppearance,
-    }),
-    [clientSecret],
-  )
+  const isInitializing = isCreatingOrder || (!razorpayOrderId && !localError && !error)
+  const canShowPayButton = !!razorpayOrderId && !!scriptLoaded && !!razorpayKeyId && amountPaise > 0
 
   return (
     <div className="checkout-step">
@@ -306,14 +322,66 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
         </div>
       )}
 
-      {canRenderForm && (
-        <Elements stripe={stripe} options={elementOptions}>
-          <PaymentForm
-            amountPaise={amountPaise}
-            onSuccess={handleSuccess}
-            onFailure={handleFailure}
-          />
-        </Elements>
+      {canShowPayButton && (
+        <div className="razorpay-payment-section">
+          {/* Payment method preview cards (informational) */}
+          <div className="razorpay-methods-preview">
+            <div className="razorpay-method-card">
+              <div className="razorpay-method-icon" style={{ background: '#09B5A6' }}>
+                <span style={{ color: 'white', fontWeight: 700, fontSize: '0.85rem' }}>UPI</span>
+              </div>
+              <span>PhonePe · GPay · Paytm · BHIM</span>
+            </div>
+            <div className="razorpay-method-card">
+              <div className="razorpay-method-icon" style={{ background: '#7A0C0C' }}>
+                <i className="fas fa-credit-card" style={{ color: 'white' }} aria-hidden="true"></i>
+              </div>
+              <span>Credit / Debit Card</span>
+            </div>
+            <div className="razorpay-method-card">
+              <div className="razorpay-method-icon" style={{ background: '#C46A2E' }}>
+                <i className="fas fa-university" style={{ color: 'white' }} aria-hidden="true"></i>
+              </div>
+              <span>Netbanking · Wallets</span>
+            </div>
+          </div>
+
+          <div className="payment-security-note">
+            <i className="fas fa-lock" aria-hidden="true"></i>
+            <span>
+              Your payment is secured by Razorpay (RBI-regulated). We never see or store
+              your card details. All major UPI apps, credit & debit cards accepted.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Amount to pay</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--dark-red)' }}>
+                {formatPrice(amountPaise)}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="checkout-btn checkout-btn-primary"
+              onClick={handlePay}
+              disabled={isPaymentModalOpen || isVerifyingPayment}
+              style={{ minWidth: 180, justifyContent: 'center' }}
+            >
+              {isPaymentModalOpen || isVerifyingPayment ? (
+                <>
+                  <span className="payment-loading-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} aria-hidden="true"></span>
+                  {isVerifyingPayment ? 'Verifying…' : 'Processing…'}
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-lock" aria-hidden="true"></i>
+                  Pay {formatPrice(amountPaise)}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="checkout-nav-buttons" style={{ marginTop: 24 }}>
@@ -321,7 +389,7 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
           type="button"
           className="checkout-btn checkout-btn-secondary"
           onClick={onBack}
-          disabled={isCreatingOrder}
+          disabled={isCreatingOrder || isVerifyingPayment}
         >
           <i className="fas fa-arrow-left" aria-hidden="true"></i>
           Back

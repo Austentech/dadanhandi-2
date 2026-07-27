@@ -2,6 +2,22 @@
 
 Manual test cases for the Phase 2 Module 3 Checkout & Payment system. Work through each test case before declaring the module production-ready.
 
+> ⚠️ **UPDATED — We switched from Stripe to Razorpay.**
+>
+> Use **`docs/RAZORPAY_VERCEL_GUIDE.md`** as your PRIMARY guide. It contains:
+> - How to test on Vercel preview deploys (no `localhost`)
+> - How to set up Razorpay account + webhooks pointing to your Vercel URL
+> - How to debug via Vercel function logs
+> - A complete "going live" checklist for production
+> - Razorpay test cards + UPI IDs
+>
+> This document covers the test CASES (what to verify). The Razorpay Vercel guide covers the test WORKFLOW (how to run them).
+>
+> **Note:** Card numbers and UPI IDs in this file are for Stripe. Replace them with Razorpay test cards from the Razorpay guide:
+> - Success: `4111 1111 1111 1111` (was Stripe `4242 4242 4242 4242`)
+> - Decline: `4000 0000 0000 0002` (same as Stripe — Razorpay uses this too)
+> - UPI success: `success@razorpay` (was Stripe `success@stripe`)
+
 > ⚠️ **If you do NOT run code locally (GitHub → Vercel → Test workflow):**
 >
 > Use **`docs/VERCEL_TESTING_GUIDE.md`** as your PRIMARY guide. It contains:

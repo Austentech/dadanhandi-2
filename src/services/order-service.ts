@@ -49,7 +49,7 @@ interface DbOrderRow {
   reward_points_earned: number
   payment_status: string
   order_status: string
-  stripe_payment_intent_id: string | null
+  razorpay_order_id: string | null
   customer_notes: string | null
   created_at: string
   updated_at: string
@@ -91,7 +91,7 @@ function dbOrderToHeader(row: DbOrderRow): OrderHeader {
     rewardPointsEarned: row.reward_points_earned,
     paymentStatus: row.payment_status as OrderHeader['paymentStatus'],
     orderStatus: row.order_status as OrderHeader['orderStatus'],
-    stripePaymentIntentId: row.stripe_payment_intent_id,
+    razorpayOrderId: row.razorpay_order_id,
     customerNotes: row.customer_notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -257,24 +257,24 @@ export async function findOrderByIdempotencyKey(
 }
 
 // ============================================================================
-// ATTACH PAYMENT INTENT TO ORDER
+// ATTACH RAZORPAY ORDER TO INTERNAL ORDER
 // ============================================================================
-export async function attachPaymentIntentToOrder(params: {
+export async function attachRazorpayOrderToOrder(params: {
   orderId: string
   userId: string
-  stripePaymentIntentId: string
+  razorpayOrderId: string
   amountPaise: number
 }): Promise<{ success: boolean; message: string }> {
   const supabase = await createServerClient()
-  const { data, error } = await supabase.rpc('attach_payment_intent_to_order', {
+  const { data, error } = await supabase.rpc('attach_razorpay_order_to_order', {
     p_order_id: params.orderId,
     p_user_id: params.userId,
-    p_stripe_payment_intent_id: params.stripePaymentIntentId,
+    p_razorpay_order_id: params.razorpayOrderId,
     p_amount_paise: params.amountPaise,
   })
 
   if (error) {
-    console.error('[ORDER SERVICE] attachPaymentIntentToOrder RPC error:', error.message)
+    console.error('[ORDER SERVICE] attachRazorpayOrderToOrder RPC error:', error.message)
     return { success: false, message: 'Failed to link payment to order.' }
   }
 
@@ -286,11 +286,15 @@ export async function attachPaymentIntentToOrder(params: {
 }
 
 // ============================================================================
-// MARK ORDER SUCCEEDED (called from webhook)
+// MARK ORDER SUCCEEDED
 // ============================================================================
+// Called EITHER from:
+//  - /api/checkout/verify-payment (primary, after client verifies signature)
+//  - /api/razorpay/webhook (secondary, for resilience if client closes browser)
 export async function markOrderSucceeded(params: {
   orderId: string
-  stripeChargeId: string
+  razorpayPaymentId: string
+  razorpaySignature: string
   webhookEventId: string
   eventType: string
   rawPayload: unknown
@@ -298,7 +302,8 @@ export async function markOrderSucceeded(params: {
   const supabase = await createServerClient()
   const { data, error } = await supabase.rpc('mark_order_succeeded', {
     p_order_id: params.orderId,
-    p_stripe_charge_id: params.stripeChargeId,
+    p_razorpay_payment_id: params.razorpayPaymentId,
+    p_razorpay_signature: params.razorpaySignature,
     p_webhook_event_id: params.webhookEventId,
     p_event_type: params.eventType,
     p_raw_payload: params.rawPayload,
@@ -324,8 +329,9 @@ export async function markOrderSucceeded(params: {
 }
 
 // ============================================================================
-// MARK ORDER FAILED (called from webhook)
+// MARK ORDER FAILED
 // ============================================================================
+// Called EITHER from verify-payment (signature invalid) or from webhook.
 export async function markOrderFailed(params: {
   orderId: string
   failureReason: string
@@ -424,14 +430,14 @@ export async function cancelDraftOrder(
 }
 
 // ============================================================================
-// GET ORDER BY PAYMENT INTENT ID (used by webhook)
+// GET ORDER BY RAZORPAY ORDER ID (used by webhook)
 // ============================================================================
 /**
- * Find an order by its Stripe PaymentIntent ID. Used by the webhook
- * handler to locate the order from the PaymentIntent metadata.
+ * Find an order by its Razorpay order_id. Used by the webhook handler
+ * to locate the order from the webhook payload.
  */
-export async function findOrderByPaymentIntentId(
-  stripePaymentIntentId: string,
+export async function findOrderByRazorpayOrderId(
+  razorpayOrderId: string,
 ): Promise<OrderHeader | null> {
   // Use the admin client for webhook (service role bypasses RLS)
   const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -440,11 +446,11 @@ export async function findOrderByPaymentIntentId(
   const { data, error } = await supabase
     .from('orders')
     .select('*')
-    .eq('stripe_payment_intent_id', stripePaymentIntentId)
+    .eq('razorpay_order_id', razorpayOrderId)
     .maybeSingle()
 
   if (error) {
-    console.error('[ORDER SERVICE] findOrderByPaymentIntentId error:', error.message)
+    console.error('[ORDER SERVICE] findOrderByRazorpayOrderId error:', error.message)
     return null
   }
 

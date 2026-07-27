@@ -101,7 +101,7 @@ export interface OrderHeader {
   rewardPointsEarned: number
   paymentStatus: PaymentStatus
   orderStatus: OrderStatus
-  stripePaymentIntentId: string | null
+  razorpayOrderId: string | null
   customerNotes: string | null
   createdAt: string
   updatedAt: string
@@ -141,8 +141,9 @@ export interface Payment {
   id: string
   orderId: string
   userId: string
-  stripePaymentIntentId: string
-  stripeChargeId: string | null
+  razorpayOrderId: string
+  razorpayPaymentId: string | null
+  razorpaySignature: string | null
   amountPaise: Paise
   currency: string
   status: PaymentStatus
@@ -204,8 +205,8 @@ export interface CheckoutState {
   orderId: string | null
   /** Order number (set in step 5) */
   orderNumber: string | null
-  /** Stripe PaymentIntent client secret (set in step 5) */
-  clientSecret: string | null
+  /** Razorpay order_id (server-created; passed to Razorpay Checkout) */
+  razorpayOrderId: string | null
   /** Optional customer note */
   customerNotes: string
 }
@@ -261,13 +262,33 @@ export interface CreateOrderResponse {
   data?: {
     orderId: string
     orderNumber: string
-    /** Stripe PaymentIntent client_secret — used by Stripe Elements */
-    clientSecret: string
+    /** Razorpay order_id — used by Razorpay Checkout */
+    razorpayOrderId: string
     /** Amount to charge (paise) */
     amountPaise: Paise
     currency: string
     /** Final server-validated amount */
     finalAmountPaise: Paise
+  }
+}
+
+/** Request body for POST /api/checkout/verify-payment */
+export interface VerifyPaymentRequest {
+  orderId: string
+  razorpayOrderId: string
+  razorpayPaymentId: string
+  razorpaySignature: string
+}
+
+/** Response from POST /api/checkout/verify-payment */
+export interface VerifyPaymentResponse {
+  success: boolean
+  message: string
+  data?: {
+    orderId: string
+    orderNumber: string
+    orderStatus: OrderStatus
+    rewardPointsEarned: number
   }
 }
 
@@ -342,6 +363,6 @@ export const CHECKOUT_CONFIG = {
   ] as const,
   /** Max customer notes length */
   maxCustomerNotesLength: 500,
-  /** Stripe currency code */
+  /** Currency code (always 'inr' for Razorpay India) */
   currency: 'inr' as const,
 } as const

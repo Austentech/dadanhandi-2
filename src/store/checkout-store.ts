@@ -6,7 +6,7 @@
  * RESPONSIBILITIES:
  *  - Hold the user's selections (branch, slot, donations, reward points)
  *  - Hold the server-validated final amount
- *  - Hold the created order ID + Stripe client_secret (after step 5)
+ *  - Hold the created order ID + Razorpay order_id (after step 5)
  *  - Track loading / error states for each API call
  *  - Provide actions: validateCheckout, createOrder, fetchRewardBalance,
  *    fetchPickupSlots, fetchBranches, fetchOrderStatus, cancelOrder
@@ -15,9 +15,8 @@
  *  - The client store holds a COPY of the validated amount for display.
  *  - The server re-validates everything before creating the order —
  *    the client's copy is for UX only, never trusted.
- *  - The Stripe client_secret IS safe to store client-side (it's designed
- *    to be embedded in client code; it can only be used to confirm the
- *    specific PaymentIntent it belongs to).
+ *  - The Razorpay order_id IS safe to store client-side (it's just an
+ *    identifier — only Razorpay can produce a valid signature for it).
  */
 
 'use client'
@@ -50,7 +49,7 @@ interface CheckoutStoreState {
   cartItems: CartItem[]
   cartTotals: CartTotals | null
   rewardBalance: number  // user's current reward points
-  stripePublishableKey: string | null
+  razorpayKeyId: string | null
 
   // -------- SERVER-VALIDATED STATE (from /api/checkout/validate) --------
   validatedSubtotalPaise: Paise | null
@@ -64,12 +63,13 @@ interface CheckoutStoreState {
   // -------- CREATED ORDER --------
   orderId: string | null
   orderNumber: string | null
-  clientSecret: string | null
+  razorpayOrderId: string | null
   idempotencyKey: string | null
 
   // -------- UI STATE --------
   isValidating: boolean
   isCreatingOrder: boolean
+  isVerifyingPayment: boolean
   isFetchingBalance: boolean
   isFetchingSlots: boolean
   isFetchingBranches: boolean
@@ -94,6 +94,11 @@ interface CheckoutStoreState {
 
   validateCheckout: () => Promise<{ success: boolean; message: string }>
   createOrder: () => Promise<{ success: boolean; message: string; data?: CreateOrderResponse['data'] }>
+  verifyPayment: (params: {
+    razorpayPaymentId: string
+    razorpayOrderId: string
+    razorpaySignature: string
+  }) => Promise<{ success: boolean; message: string; orderStatus?: string }>
   pollOrderStatus: (orderId: string) => Promise<{ success: boolean; orderStatus?: string; message?: string }>
   cancelOrder: (orderId: string) => Promise<{ success: boolean; message: string }>
 
@@ -117,7 +122,7 @@ const initialState = {
   cartItems: [] as CartItem[],
   cartTotals: null as CartTotals | null,
   rewardBalance: 0,
-  stripePublishableKey: null as string | null,
+  razorpayKeyId: null as string | null,
 
   validatedSubtotalPaise: null as Paise | null,
   validatedDonationPlantationPaise: null as Paise | null,
@@ -129,11 +134,12 @@ const initialState = {
 
   orderId: null as string | null,
   orderNumber: null as string | null,
-  clientSecret: null as string | null,
+  razorpayOrderId: null as string | null,
   idempotencyKey: null as string | null,
 
   isValidating: false,
   isCreatingOrder: false,
+  isVerifyingPayment: false,
   isFetchingBalance: false,
   isFetchingSlots: false,
   isFetchingBranches: false,
@@ -212,14 +218,14 @@ export const useCheckoutStore = create<CheckoutStoreState>((set, get) => ({
   },
 
   // --------------------------------------------------------------------------
-  // FETCH CONFIG (Stripe publishable key + constants)
+  // FETCH CONFIG (Razorpay key_id + constants)
   // --------------------------------------------------------------------------
   fetchConfig: async () => {
     try {
       const res = await fetch('/api/checkout/config')
       const data = await res.json()
       if (data.success && data.data) {
-        set({ stripePublishableKey: data.data.stripePublishableKey })
+        set({ razorpayKeyId: data.data.razorpayKeyId })
       }
     } catch {
       // Non-critical — payment step will show error if no key
@@ -363,7 +369,7 @@ export const useCheckoutStore = create<CheckoutStoreState>((set, get) => ({
   },
 
   // --------------------------------------------------------------------------
-  // CREATE ORDER (creates draft order + Stripe PaymentIntent)
+  // CREATE ORDER (creates draft order + Razorpay Order)
   // --------------------------------------------------------------------------
   createOrder: async () => {
     const state = get()
@@ -401,7 +407,7 @@ export const useCheckoutStore = create<CheckoutStoreState>((set, get) => ({
           isCreatingOrder: false,
           orderId: data.data.orderId,
           orderNumber: data.data.orderNumber,
-          clientSecret: data.data.clientSecret,
+          razorpayOrderId: data.data.razorpayOrderId,
           validatedFinalAmountPaise: data.data.finalAmountPaise,
         })
         return { success: true, message: data.message, data: data.data }
@@ -419,7 +425,51 @@ export const useCheckoutStore = create<CheckoutStoreState>((set, get) => ({
   },
 
   // --------------------------------------------------------------------------
-  // POLL ORDER STATUS (after Stripe confirms payment)
+  // VERIFY PAYMENT (called by Razorpay Checkout handler after payment)
+  // --------------------------------------------------------------------------
+  verifyPayment: async ({ razorpayPaymentId, razorpayOrderId, razorpaySignature }) => {
+    const state = get()
+    const orderId = state.orderId
+    if (!orderId) {
+      return { success: false, message: 'No active order to verify.' }
+    }
+
+    set({ isVerifyingPayment: true, error: null })
+    try {
+      const res = await fetch('/api/checkout/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          razorpayOrderId,
+          razorpayPaymentId,
+          razorpaySignature,
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        set({ isVerifyingPayment: false })
+        return {
+          success: true,
+          message: data.message,
+          orderStatus: data.data?.orderStatus,
+        }
+      }
+
+      set({ isVerifyingPayment: false, error: data.message })
+      return { success: false, message: data.message }
+    } catch {
+      set({
+        isVerifyingPayment: false,
+        error: 'Network error during verification. Please contact support.',
+      })
+      return { success: false, message: 'Network error during verification.' }
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // POLL ORDER STATUS (after Razorpay payment is verified)
   // --------------------------------------------------------------------------
   pollOrderStatus: async (orderId) => {
     set({ isPollingOrder: true })

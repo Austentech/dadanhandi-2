@@ -1,7 +1,15 @@
 /**
  * POST /api/checkout/create-order
  * -------------------------------
- * Create a draft order + Stripe PaymentIntent atomically.
+ * Create a draft order + Razorpay Order atomically.
+ *
+ * Razorpay's flow is simpler than Stripe:
+ *  1. Server creates a draft order in our DB (idempotent via idempotency_key)
+ *  2. Server creates a Razorpay Order via Razorpay API (idempotent via header)
+ *  3. Server attaches Razorpay order_id to our draft order
+ *  4. Returns Razorpay order_id + key_id to client
+ *  5. Client opens Razorpay Checkout with order_id
+ *  6. After payment, client calls /api/checkout/verify-payment
  *
  * Idempotency:
  *  - Client sends `idempotencyKey` (UUID) in the request body
@@ -9,7 +17,7 @@
  *    a) DB RPC `create_draft_order` will fail with unique constraint violation
  *    b) We catch the error, look up the existing order by idempotency_key
  *    c) If existing order is in 'draft'/'awaiting_payment' state, return
- *       the existing order info (client must use existing PI's client_secret)
+ *       the existing order info (client re-uses existing Razorpay order_id)
  *    d) If existing order is in 'confirmed' state, return success status
  *    e) If 'failed'/'cancelled', reject — user needs a new idempotency key
  *
@@ -31,10 +39,10 @@ import { computeCheckout, sanitizeCustomerNotes } from '@/services/checkout-serv
 import {
   createDraftOrder,
   findOrderByIdempotencyKey,
-  attachPaymentIntentToOrder,
+  attachRazorpayOrderToOrder,
   cancelDraftOrder,
 } from '@/services/order-service'
-import { createPaymentIntent } from '@/services/payment-service'
+import { createRazorpayOrder } from '@/services/payment-service'
 import { getISTTodayDate } from '@/services/pickup-slot-service'
 import { CHECKOUT_CONFIG } from '@/types/checkout'
 
@@ -114,7 +122,7 @@ export async function POST(request: Request) {
           data: {
             orderId: existingOrder.id,
             orderNumber: existingOrder.orderNumber,
-            clientSecret: null,
+            razorpayOrderId: existingOrder.razorpayOrderId,
             amountPaise: existingOrder.finalAmountPaise,
             currency: CHECKOUT_CONFIG.currency,
             finalAmountPaise: existingOrder.finalAmountPaise,
@@ -134,24 +142,18 @@ export async function POST(request: Request) {
       }
 
       // Order exists in 'draft' or 'awaiting_payment' state.
-      // If it already has a Stripe PaymentIntent, return that PI's id so the
-      // client can fetch the existing client_secret from their store (or
-      // re-mount Stripe Elements with a fresh key if they lost it).
+      // Return the existing Razorpay order_id so client can re-open Checkout.
       return NextResponse.json({
         success: true,
         message: 'Checkout already in progress.',
         data: {
           orderId: existingOrder.id,
           orderNumber: existingOrder.orderNumber,
-          // Client should already have the client_secret from the original
-          // create-order call. If they lost it (refresh), they need to
-          // start a new checkout with a fresh idempotency key.
-          clientSecret: null,
+          razorpayOrderId: existingOrder.razorpayOrderId,
           amountPaise: existingOrder.finalAmountPaise,
           currency: CHECKOUT_CONFIG.currency,
           finalAmountPaise: existingOrder.finalAmountPaise,
           orderStatus: existingOrder.orderStatus,
-          stripePaymentIntentId: existingOrder.stripePaymentIntentId,
         },
       })
     }
@@ -189,8 +191,8 @@ export async function POST(request: Request) {
     const orderId = draftResult.orderId
     const orderNumber = draftResult.orderNumber
 
-    // 7. Create Stripe PaymentIntent
-    const piResult = await createPaymentIntent({
+    // 7. Create Razorpay Order
+    const rzpResult = await createRazorpayOrder({
       orderId,
       orderNumber,
       userId: user.id,
@@ -198,26 +200,26 @@ export async function POST(request: Request) {
       idempotencyKey: input.idempotencyKey,
     })
 
-    if (!piResult.success || !piResult.data) {
-      // Failed to create PI. Cancel the order so the user can try again.
+    if (!rzpResult.success || !rzpResult.data) {
+      // Failed to create Razorpay order. Cancel the draft so user can retry.
       await cancelDraftOrder(user.id, orderId)
       return NextResponse.json(
-        { success: false, message: piResult.message },
+        { success: false, message: rzpResult.message },
         { status: 502 },
       )
     }
 
-    // 8. Attach PI to order (creates payment row, transitions to awaiting_payment)
-    const attachResult = await attachPaymentIntentToOrder({
+    // 8. Attach Razorpay order_id to our order (creates payment row, transitions to awaiting_payment)
+    const attachResult = await attachRazorpayOrderToOrder({
       orderId,
       userId: user.id,
-      stripePaymentIntentId: piResult.data.paymentIntentId,
+      razorpayOrderId: rzpResult.data.razorpayOrderId,
       amountPaise: c.finalAmountPaise,
     })
 
     if (!attachResult.success) {
-      // PI was created but we couldn't attach it. Cancel the order; the PI
-      // will be auto-cancelled by Stripe after 24h of no capture.
+      // Razorpay order was created but we couldn't attach it. Cancel our order;
+      // the Razorpay order will expire automatically after 15 min of no payment.
       await cancelDraftOrder(user.id, orderId)
       return NextResponse.json(
         { success: false, message: 'Failed to link payment. Please try again.' },
@@ -240,16 +242,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // 10. Return success — client now mounts Stripe Elements with the client_secret
+    // 10. Return success — client now opens Razorpay Checkout with the order_id
     return NextResponse.json({
       success: true,
       message: 'Order created. Please complete payment.',
       data: {
         orderId,
         orderNumber,
-        clientSecret: piResult.data.clientSecret,
-        amountPaise: piResult.data.amountPaise,
-        currency: piResult.data.currency,
+        razorpayOrderId: rzpResult.data.razorpayOrderId,
+        amountPaise: rzpResult.data.amountPaise,
+        currency: rzpResult.data.currency,
         finalAmountPaise: c.finalAmountPaise,
         orderStatus: 'awaiting_payment',
       },

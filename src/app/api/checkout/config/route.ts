@@ -2,7 +2,7 @@
  * GET /api/checkout/config
  * ------------------------
  * Returns client-side configuration for the checkout flow:
- *  - Stripe publishable key (safe to expose)
+ *  - Razorpay key_id (safe to expose to client)
  *  - Reward config (earn rules, redeem rules)
  *  - Donation amounts
  *  - Pickup config (operating hours, slot interval, timezone)
@@ -12,7 +12,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getPublishableKey } from '@/services/payment-service'
+import { getKeyId } from '@/services/payment-service'
 import {
   CHECKOUT_CONFIG,
   REWARD_CONFIG,
@@ -25,7 +25,7 @@ export async function GET() {
     success: true,
     message: 'Checkout config loaded.',
     data: {
-      stripePublishableKey: getPublishableKey(),
+      razorpayKeyId: getKeyId(),
       reward: {
         earnPointsPerQualifyingOrder: REWARD_CONFIG.earnPointsPerQualifyingOrder,
         earnThresholdPaise: REWARD_CONFIG.earnThresholdPaise,

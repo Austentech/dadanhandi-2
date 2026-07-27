@@ -253,3 +253,82 @@ Stage Summary:
 - Existing CHECKOUT_TESTING.md still useful for test CASES, with pointer to Vercel guide for WORKFLOW
 - User can now follow a single, end-to-end guide that matches their actual workflow (no localhost, no Stripe CLI)
 - Key insight documented: "Send test webhook" button in Stripe Dashboard sends a generic test event with fake PI ID — useful for verifying endpoint reachability, but real flow must be tested by doing actual test payments via the UI
+
+---
+Task ID: M3-RAZORPAY-MIGRATION
+Agent: Main Agent
+Task: Replace Stripe with Razorpay payment gateway (user rejected by Stripe India invite-only program; needs fast, easy-setup Indian payment gateway). Update config with zero errors + create Vercel deployment guide.
+
+Work Log:
+- Installed `razorpay` SDK, removed `@stripe/stripe-js`, `@stripe/react-stripe-js`, `stripe`
+- Created `src/types/razorpay.d.ts` — TypeScript declarations for Razorpay Checkout.js (loaded via script tag, not npm)
+- Rewrote `src/services/payment-service.ts`:
+  - `createRazorpayOrder()` replaces `createPaymentIntent()` — calls Razorpay Orders API
+  - `verifyPaymentSignature()` — HMAC SHA256 with timing-safe compare (THE security anchor)
+  - `verifyWebhookSignature()` — for optional webhook route
+  - `retrievePayment()` — for polling fallback
+  - `getKeyId()` replaces `getPublishableKey()`
+- Rewrote `src/app/api/stripe/webhook/route.ts` → DELETED, replaced with `src/app/api/razorpay/webhook/route.ts`
+- Created NEW endpoint `src/app/api/checkout/verify-payment/route.ts`:
+  - PRIMARY payment confirmation path (no webhook needed!)
+  - Verifies Razorpay signature server-side
+  - Calls mark_order_succeeded/failed RPCs (idempotent)
+- Updated `src/app/api/checkout/create-order/route.ts`: now calls createRazorpayOrder + attachRazorpayOrderToOrder
+- Updated `src/app/api/checkout/config/route.ts`: returns `razorpayKeyId` instead of `stripePublishableKey`
+- Updated `src/services/order-service.ts`:
+  - Renamed `attachPaymentIntentToOrder` → `attachRazorpayOrderToOrder`
+  - Renamed `findOrderByPaymentIntentId` → `findOrderByRazorpayOrderId`
+  - `markOrderSucceeded()` now takes `razorpayPaymentId` + `razorpaySignature` (was `stripeChargeId`)
+- Updated `src/types/checkout.ts`:
+  - `OrderHeader.razorpayOrderId` (was `stripePaymentIntentId`)
+  - `Payment.razorpayOrderId`, `razorpayPaymentId`, `razorpaySignature` (was `stripePaymentIntentId`, `stripeChargeId`)
+  - `CheckoutState.razorpayOrderId` (was `clientSecret`)
+  - Added `VerifyPaymentRequest` / `VerifyPaymentResponse` types
+- Updated `src/store/checkout-store.ts`:
+  - Removed `clientSecret`, `stripePublishableKey`, `isCreatingOrder` → kept
+  - Added `razorpayOrderId`, `razorpayKeyId`, `isVerifyingPayment`
+  - Added `verifyPayment()` action (calls /api/checkout/verify-payment)
+  - Updated `createOrder()` to use new Razorpay response shape
+- Rewrote `src/components/checkout/Step5Payment.tsx`:
+  - Loads Razorpay Checkout.js via dynamic script tag
+  - Opens Razorpay modal (popup) when user clicks "Pay"
+  - On success: calls verifyPayment() → server verifies signature → onSuccess callback
+  - On failure: shows error toast, allows retry (cart preserved)
+  - Pre-fills user email/phone from auth state
+- Updated SQL migration 004 to use Razorpay column names:
+  - `orders.stripe_payment_intent_id` → `orders.razorpay_order_id`
+  - `payments.stripe_payment_intent_id` → `payments.razorpay_order_id`
+  - `payments.stripe_charge_id` → `payments.razorpay_payment_id`
+  - Added `payments.razorpay_signature` column
+  - Renamed RPC `attach_payment_intent_to_order` → `attach_razorpay_order_to_order`
+  - Updated `mark_order_succeeded` signature: `p_stripe_charge_id` → `p_razorpay_payment_id` + `p_razorpay_signature`
+- Added Razorpay CSS to `src/app/globals.css`:
+  - `.razorpay-payment-section`, `.razorpay-methods-preview`, `.razorpay-method-card`, `.razorpay-method-icon`
+  - Responsive grid for payment method preview cards
+- Updated `.env.local.example` with Razorpay variables:
+  - `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
+- Created comprehensive `docs/RAZORPAY_VERCEL_GUIDE.md` (~1000 lines, 8 phases):
+  - Phase 1: Razorpay account setup (instant, no invite needed)
+  - Phase 2: Supabase DB migration
+  - Phase 3: Vercel env vars
+  - Phase 4: First deploy + sanity check
+  - Phase 5: Full E2E testing with Razorpay test cards
+  - Phase 6: OPTIONAL webhook setup (resilience layer)
+  - Phase 7: Debugging & monitoring
+  - Phase 8: Going live (production KYC + live keys)
+- Added deprecation notices to old Stripe docs:
+  - `docs/STRIPE_SETUP.md` — marked DEPRECATED
+  - `docs/VERCEL_TESTING_GUIDE.md` — marked DEPRECATED
+  - `docs/CHECKOUT_TESTING.md` — added pointer to Razorpay guide + test card mapping
+- Verified build with `bunx next build` → SUCCESS, 0 errors, all new routes registered:
+  - `/api/checkout/verify-payment` ✅
+  - `/api/razorpay/webhook` ✅
+  - Old `/api/stripe/webhook` removed ✅
+
+Stage Summary:
+- Complete Stripe → Razorpay migration done with ZERO build errors
+- Razorpay flow is SIMPLER than Stripe: no webhook required for happy path (signature verification client → server is sufficient)
+- Webhook is OPTIONAL (resilience layer for case where user closes browser after payment)
+- All idempotency preserved: DB-level unique constraint on idempotency_key + RPC-level idempotency on mark_order_succeeded/failed
+- Security preserved: HMAC SHA256 signature verification with timing-safe compare
+- User can now follow `docs/RAZORPAY_VERCEL_GUIDE.md` to test end-to-end on Vercel preview deploy with Razorpay test cards

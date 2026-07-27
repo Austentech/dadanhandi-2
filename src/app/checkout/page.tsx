@@ -6,7 +6,7 @@
  *   Step 2: Select Pickup Branch
  *   Step 3: Select Pickup Time
  *   Step 4: Donation & Rewards
- *   Step 5: Payment (Stripe Elements)
+ *   Step 5: Payment (Razorpay Checkout)
  *   Step 6: Confirmation
  *
  * AUTH GATE:
@@ -118,7 +118,7 @@ export default function CheckoutPage() {
         durationMs: 6000,
       })
       // Stay on step 5 so user can retry with the same order
-      // (Stripe Elements will re-mount; the PaymentIntent may need a refresh)
+      // (Razorpay Checkout will re-open; the order is preserved)
     },
     [pushToast],
   )

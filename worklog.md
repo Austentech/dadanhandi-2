@@ -332,3 +332,33 @@ Stage Summary:
 - All idempotency preserved: DB-level unique constraint on idempotency_key + RPC-level idempotency on mark_order_succeeded/failed
 - Security preserved: HMAC SHA256 signature verification with timing-safe compare
 - User can now follow `docs/RAZORPAY_VERCEL_GUIDE.md` to test end-to-end on Vercel preview deploy with Razorpay test cards
+
+---
+Task ID: M3-RAZORPAY-FIX-005
+Agent: Main Agent
+Task: Fix error when user re-runs 004_create_checkout_payment_rewards.sql: "column razorpay_order_id does not exist". Database still has OLD Stripe column names from when the user first ran the original Stripe version of 004; the updated Razorpay version of 004 fails on CREATE INDEX because the razorpay_order_id column doesn't exist yet.
+
+Work Log:
+- Diagnosed root cause: 004 file was modified in previous session to use Razorpay column names, but the user's database still has the OLD Stripe columns (stripe_payment_intent_id, stripe_charge_id). CREATE TABLE IF NOT EXISTS skips (tables exist), but CREATE INDEX ... ON orders(razorpay_order_id) FAILS because the column doesn't exist.
+- Identified secondary issue: two old Stripe RPC functions have incompatible signatures with the new Razorpay versions:
+  - `attach_payment_intent_to_order(uuid, uuid, text, integer)` — orphaned (renamed to `attach_razorpay_order_to_order`)
+  - `mark_order_succeeded(uuid, text, text, text, jsonb)` — 5 params (new version has 6: adds `p_razorpay_signature`). PostgreSQL CREATE OR REPLACE cannot change param count, so old function MUST be dropped first.
+- Created new migration file: `supabase/migrations/005_migrate_stripe_to_razorpay.sql`
+  - STEP 1: Migrate `orders` table — renames `stripe_payment_intent_id` → `razorpay_order_id` (or adds if missing). Uses DO $$ block with information_schema check for full idempotency.
+  - STEP 2: Migrate `payments` table — renames `stripe_payment_intent_id` → `razorpay_order_id`, `stripe_charge_id` → `razorpay_payment_id`, and adds `razorpay_signature` column. Same idempotent pattern.
+  - STEP 3: Drop old Stripe indexes (best-effort DROP INDEX IF EXISTS), create new Razorpay indexes (CREATE INDEX IF NOT EXISTS).
+  - STEP 4: Drop old Stripe RPC functions with all possible param type variants (uuid/integer, uuid/bigint, uuid/numeric — defensive).
+  - STEP 5: Verification query (informational, non-fatal).
+- Created validation script: `scripts/validate_005_sql.py`
+  - Checks $$ block balance
+  - Verifies each DO block has matching BEGIN/END and IF/END IF counts (handles ELSIF correctly: ELSIF...THEN does NOT need its own END IF)
+  - Lists all DROP FUNCTION, CREATE INDEX, ALTER TABLE statements
+  - All 11 structural checks pass with zero errors.
+
+Stage Summary:
+- Created `/home/z/my-project/supabase/migrations/005_migrate_stripe_to_razorpay.sql` — fully idempotent migration that handles all 3 possible DB states (Stripe-only, mixed, Razorpay-only).
+- Created `/home/z/my-project/scripts/validate_005_sql.py` — structural SQL validator.
+- User must run migrations in this order:
+  1. Run `005_migrate_stripe_to_razorpay.sql` FIRST (handles column renames + drops old Stripe functions)
+  2. Then RE-RUN `004_create_checkout_payment_rewards.sql` (now succeeds — creates new Razorpay RPCs and any missing indexes/policies)
+- After both migrations complete, the DB is fully Razorpay-ready.

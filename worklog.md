@@ -362,3 +362,38 @@ Stage Summary:
   1. Run `005_migrate_stripe_to_razorpay.sql` FIRST (handles column renames + drops old Stripe functions)
   2. Then RE-RUN `004_create_checkout_payment_rewards.sql` (now succeeds — creates new Razorpay RPCs and any missing indexes/policies)
 - After both migrations complete, the DB is fully Razorpay-ready.
+
+---
+Task ID: M3-GITHUB-PUSH-PROTECTION-FIX
+Agent: Main Agent
+Task: Fix GitHub Push Protection error blocking `git push` to https://github.com/Austentech/dadanhandi-2.git. Error: "Push cannot contain secrets" — GitHub flagged Stripe Test API Secret Key + Stripe API Key patterns in 3 historical commits (f601fe9, 37f81d9, 8ebf4ab) inside docs/STRIPE_SETUP.md and docs/VERCEL_TESTING_GUIDE.md.
+
+Work Log:
+- Diagnosed root cause: The 2 deprecated Stripe docs contained Stripe test key PLACEHOLDERS like `STRIPE_TEST_SECRET_PLACEHOLDER` and `STRIPE_LIVE_PUBLISHABLE_PLACEHOLDER`. Even though these are NOT real secrets (just x's), GitHub's secret scanner pattern-matches them because the format `sk_test_[a-zA-Z0-9]{24}` matches.
+- Verified the 3 flagged commits (f601fe9, 37f81d9, 8ebf4ab) are the only commits in history touching these 2 files. No other commits/files contain Stripe key patterns.
+- Verified other docs (CHECKOUT_API.md, CHECKOUT_TESTING.md, etc.) only contain safe patterns like `pk_test_...` (3 literal dots) which do NOT match GitHub's secret regex — they were not flagged.
+- Decision: Since these 2 Stripe docs were already marked DEPRECATED in the previous session (replaced by docs/RAZORPAY_VERCEL_GUIDE.md), the cleanest fix is to delete them entirely AND rewrite git history to purge them from past commits.
+- Created safety backup tag: `backup-before-history-rewrite` pointing to the pre-rewrite HEAD (6fcaf96).
+- Deleted docs/STRIPE_SETUP.md and docs/VERCEL_TESTING_GUIDE.md from working tree; committed deletion (commit 5ecc9fc, later absorbed into history rewrite).
+- Installed `git-filter-repo` via pip (with --break-system-packages flag).
+- Ran `git filter-repo --path docs/STRIPE_SETUP.md --path docs/VERCEL_TESTING_GUIDE.md --invert-paths --force`:
+  - Parsed 26 commits
+  - Removed the 2 files from EVERY commit in history (including commits that originally added them)
+  - Rewrote 4 commit SHAs (f601fe9→9a42678, 37f81d9→45c217c, 8ebf4ab→56ce897, 6fcaf96→c684e70)
+  - filter-repo automatically removed the `origin` remote as a safety measure
+- Re-added origin remote: `git remote add origin https://github.com/Austentech/dadanhandi-2.git`
+- Verified ZERO Stripe key patterns remain in entire git history:
+  `git log --all -p | grep -cE "sk_test_[a-zA-Z0-9_x]{15,}|..."` → 0
+- Verified the 2 files no longer exist in any commit:
+  `git log --all --oneline -- docs/STRIPE_SETUP.md docs/VERCEL_TESTING_GUIDE.md` → empty output
+- Verified remote still at bc28913 (5th commit from new HEAD) — local history is a superset of remote, so force-push is safe.
+
+Stage Summary:
+- Stripe docs PURGED from working tree AND entire git history.
+- All 26 commits rewritten; 4 SHAs changed (commits from f601fe9 onwards).
+- Backup tag `backup-before-history-rewrite` preserved at old HEAD (6fcaf96) for emergency rollback.
+- Local repo is ready for force-push. User must run the push themselves (requires GitHub auth credentials).
+- Command to push: `git push origin main --force-with-lease`
+  (Use --force-with-lease instead of --force for safety: refuses to push if remote was updated by someone else since we last fetched.)
+- If --force-with-lease fails (remote has newer commits), user can fall back to `git push origin main --force` after manually verifying no one else pushed.
+- After push succeeds, GitHub Push Protection will no longer trigger because the offending files/commits no longer exist in history.

@@ -369,9 +369,9 @@ Agent: Main Agent
 Task: Fix GitHub Push Protection error blocking `git push` to https://github.com/Austentech/dadanhandi-2.git. Error: "Push cannot contain secrets" — GitHub flagged Stripe Test API Secret Key + Stripe API Key patterns in 3 historical commits (f601fe9, 37f81d9, 8ebf4ab) inside docs/STRIPE_SETUP.md and docs/VERCEL_TESTING_GUIDE.md.
 
 Work Log:
-- Diagnosed root cause: The 2 deprecated Stripe docs contained Stripe test key PLACEHOLDERS like `STRIPE_TEST_SECRET_PLACEHOLDER` and `STRIPE_LIVE_PUBLISHABLE_PLACEHOLDER`. Even though these are NOT real secrets (just x's), GitHub's secret scanner pattern-matches them because the format `sk_test_[a-zA-Z0-9]{24}` matches.
+- Diagnosed root cause: The 2 deprecated Stripe docs contained Stripe test key PLACEHOLDERS (a `sk_test_` prefix followed by 24 placeholder characters, and a `pk_live_` prefix followed by 24 placeholder characters). Even though these are NOT real secrets (just placeholder 'x' characters), GitHub's secret scanner pattern-matches them because the format matches Stripe's real key regex.
 - Verified the 3 flagged commits (f601fe9, 37f81d9, 8ebf4ab) are the only commits in history touching these 2 files. No other commits/files contain Stripe key patterns.
-- Verified other docs (CHECKOUT_API.md, CHECKOUT_TESTING.md, etc.) only contain safe patterns like `pk_test_...` (3 literal dots) which do NOT match GitHub's secret regex — they were not flagged.
+- Verified other docs (CHECKOUT_API.md, CHECKOUT_TESTING.md, etc.) only contain safe patterns like the Stripe prefix followed by 3 literal dots (an ellipsis) which do NOT match GitHub's secret regex — they were not flagged.
 - Decision: Since these 2 Stripe docs were already marked DEPRECATED in the previous session (replaced by docs/RAZORPAY_VERCEL_GUIDE.md), the cleanest fix is to delete them entirely AND rewrite git history to purge them from past commits.
 - Created safety backup tag: `backup-before-history-rewrite` pointing to the pre-rewrite HEAD (6fcaf96).
 - Deleted docs/STRIPE_SETUP.md and docs/VERCEL_TESTING_GUIDE.md from working tree; committed deletion (commit 5ecc9fc, later absorbed into history rewrite).
@@ -382,8 +382,7 @@ Work Log:
   - Rewrote 4 commit SHAs (f601fe9→9a42678, 37f81d9→45c217c, 8ebf4ab→56ce897, 6fcaf96→c684e70)
   - filter-repo automatically removed the `origin` remote as a safety measure
 - Re-added origin remote: `git remote add origin https://github.com/Austentech/dadanhandi-2.git`
-- Verified ZERO Stripe key patterns remain in entire git history:
-  `git log --all -p | grep -cE "sk_test_[a-zA-Z0-9_x]{15,}|..."` → 0
+- Verified ZERO Stripe key patterns remain in entire git history (grep for any Stripe prefix followed by 15+ alphanumerics returned 0 matches).
 - Verified the 2 files no longer exist in any commit:
   `git log --all --oneline -- docs/STRIPE_SETUP.md docs/VERCEL_TESTING_GUIDE.md` → empty output
 - Verified remote still at bc28913 (5th commit from new HEAD) — local history is a superset of remote, so force-push is safe.

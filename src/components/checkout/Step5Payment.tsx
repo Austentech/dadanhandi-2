@@ -156,27 +156,27 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
   // ---------------------------------------------------------------------------
   const handlePay = useCallback(() => {
     if (!razorpayKeyId) {
-      const msg = 'Payment system is not configured. Please contact support.'
+      const msg = 'Payment isn’t set up yet. Try again later.'
       setLocalError(msg)
       onFailure(msg)
       return
     }
 
     if (!scriptLoaded || typeof window === 'undefined' || !window.Razorpay) {
-      const msg = 'Payment system is still loading. Please wait a moment and try again.'
+      const msg = 'Still loading… give it a second.'
       setLocalError(msg)
       return
     }
 
     if (!razorpayOrderId || !orderId) {
-      const msg = 'Order is not ready. Please wait a moment.'
+      const msg = 'Getting your order ready…'
       setLocalError(msg)
       return
     }
 
     const amountPaise = validatedFinalAmountPaise ?? 0
     if (amountPaise <= 0) {
-      const msg = 'Invalid payment amount.'
+      const msg = 'Something’s off with the amount.'
       setLocalError(msg)
       return
     }
@@ -249,7 +249,7 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
           }
         } catch (err) {
           console.error('[RAZORPAY] verifyPayment error:', err)
-          const msg = 'Could not verify payment. Please contact support with your order number.'
+          const msg = 'Couldn’t verify your payment. Don’t worry — your money is safe.'
           setLocalError(msg)
           onFailure(msg)
         }
@@ -302,9 +302,9 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
       <h2 className="checkout-step-title">Payment</h2>
       <p className="checkout-step-subtitle">
         {orderNumber ? (
-          <>Order <strong style={{ color: 'var(--dark-red)' }}>{orderNumber}</strong> · Pay securely via UPI, credit or debit card.</>
+          <>Order <strong style={{ color: 'var(--dark-red)' }}>{orderNumber}</strong> · Pay via UPI, card or netbanking.</>
         ) : (
-          'Pay securely via UPI, credit or debit card.'
+          'Pay via UPI, card or netbanking.'
         )}
       </p>
 
@@ -318,7 +318,7 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
       {isInitializing && (
         <div className="payment-loading">
           <div className="payment-loading-spinner" aria-hidden="true"></div>
-          <p>Preparing your secure payment…</p>
+          <p>Setting up your payment…</p>
         </div>
       )}
 
@@ -349,8 +349,7 @@ export default function Step5Payment({ onBack, onSuccess, onFailure }: Step5Paym
           <div className="payment-security-note">
             <i className="fas fa-lock" aria-hidden="true"></i>
             <span>
-              Your payment is secured by Razorpay (RBI-regulated). We never see or store
-              your card details. All major UPI apps, credit & debit cards accepted.
+              Payments are handled by Razorpay. Your card details stay with them — we never see them.
             </span>
           </div>
 

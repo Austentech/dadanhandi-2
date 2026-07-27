@@ -65,6 +65,7 @@ export function useSessionManager(): void {
   const { isAuthenticated, signOut } = useAuth()
   const pushToast = useToastStore((s) => s.pushToast)
   const signedOutDueToIdleRef = useRef(false)
+  const shouldForceSignOutRef = useRef(false)
 
   // --------------------------------------------------------------------------
   // RULE 1: Per-browser-session isolation
@@ -72,10 +73,10 @@ export function useSessionManager(): void {
   // If not, this is a fresh browser session (or first visit after deploy) —
   // force sign-out any lingering Supabase cookie-based session.
   //
-  // IMPORTANT: We can't check isAuthenticated here because on first mount,
-  // useAuth() is still loading (isAuthenticated=false initially). Instead,
-  // we set the marker NOW, and use a separate effect (Rule 1b) to sign out
-  // when isAuthenticated becomes true (i.e., Supabase loaded a session).
+  // Uses a REF (shouldForceSignOutRef) instead of sessionStorage to track
+  // whether we need to sign out. This prevents the bug where re-mounting
+  // the component (e.g., during navigation) re-reads a stale sessionStorage
+  // flag and force-signs out an already-authenticated user.
   // --------------------------------------------------------------------------
   const initialCheckDoneRef = useRef(false)
 
@@ -86,17 +87,17 @@ export function useSessionManager(): void {
     try {
       const marker = window.sessionStorage.getItem(KEY_SESSION_MARKER)
       if (!marker) {
-        // Fresh browser session — mark it as live AND set the "just started"
-        // flag so Rule 1b knows to force sign-out any lingering Supabase session.
+        // Fresh browser session — set marker and remember to force sign out
         window.sessionStorage.setItem(KEY_SESSION_MARKER, '1')
         window.sessionStorage.setItem(KEY_LAST_ACTIVITY, String(Date.now()))
-        window.sessionStorage.setItem('dadan_session_just_started', '1')
+        shouldForceSignOutRef.current = true
       } else {
-        // Marker exists — make sure last-activity is initialized
+        // Marker exists — this is an ongoing session, do NOT force sign out
         const last = window.sessionStorage.getItem(KEY_LAST_ACTIVITY)
         if (!last) {
           window.sessionStorage.setItem(KEY_LAST_ACTIVITY, String(Date.now()))
         }
+        shouldForceSignOutRef.current = false
       }
     } catch {
       // sessionStorage might be disabled (private browsing) — skip rule
@@ -104,32 +105,20 @@ export function useSessionManager(): void {
   }, [])
 
   // --------------------------------------------------------------------------
-  // RULE 1b: If we just set the session marker (fresh browser session) AND
-  // Supabase loaded an authenticated user, force sign-out. This runs whenever
-  // isAuthenticated changes — but only acts ONCE per fresh-session check.
+  // RULE 1b: If we just detected a fresh session AND Supabase loaded an
+  // authenticated user, force sign-out ONCE. Uses the ref (not sessionStorage)
+  // to track this — the ref resets on component remount, sessionStorage persists.
   // --------------------------------------------------------------------------
   const forcedSignOutRef = useRef(false)
 
   useEffect(() => {
     if (forcedSignOutRef.current) return
     if (!isAuthenticated) return
+    if (!shouldForceSignOutRef.current) return
 
-    try {
-      const marker = window.sessionStorage.getItem(KEY_SESSION_MARKER)
-      // If marker exists, session was already "live" — don't force sign out.
-      // If marker is missing... wait, Rule 1 already set it. So we use a
-      // DIFFERENT key to track "did we just start a fresh session?"
-      // Approach: when Rule 1 sets the marker, it also sets a "fresh" flag.
-      // This effect checks that flag and signs out if set, then clears the flag.
-      const freshFlag = window.sessionStorage.getItem('dadan_session_just_started')
-      if (freshFlag === '1') {
-        window.sessionStorage.removeItem('dadan_session_just_started')
-        forcedSignOutRef.current = true
-        signOut().catch(() => {})
-      }
-    } catch {
-      // ignore
-    }
+    forcedSignOutRef.current = true
+    shouldForceSignOutRef.current = false
+    signOut().catch(() => {})
   }, [isAuthenticated, signOut])
 
   // --------------------------------------------------------------------------

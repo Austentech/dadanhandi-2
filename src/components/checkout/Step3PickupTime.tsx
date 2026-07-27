@@ -49,7 +49,7 @@ export default function Step3PickupTime({ onBack, onNext }: Step3PickupTimeProps
 
   const handleNext = () => {
     if (!pickupSlotKey) {
-      setError('Please select a pickup time to continue.')
+      setError('Please pick a time slot first.')
       return
     }
     const slot = pickupSlots.find((s) => s.key === pickupSlotKey)
@@ -70,9 +70,9 @@ export default function Step3PickupTime({ onBack, onNext }: Step3PickupTimeProps
 
   return (
     <div className="checkout-step">
-      <h2 className="checkout-step-title">Select Pickup Time</h2>
+      <h2 className="checkout-step-title">Pick a Time</h2>
       <p className="checkout-step-subtitle">
-        Pickup is available today only. Choose a time slot below — slots that have already passed are disabled.
+        Pickup is today only. Pick a slot — greyed-out ones have already passed.
       </p>
 
       {error && (

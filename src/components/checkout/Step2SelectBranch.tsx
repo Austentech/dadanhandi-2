@@ -37,7 +37,7 @@ export default function Step2SelectBranch({ onBack, onNext }: Step2SelectBranchP
 
   const handleNext = () => {
     if (!branchSlug) {
-      setError('Please select a pickup branch to continue.')
+      setError('Please pick a branch first.')
       return
     }
     onNext()
@@ -45,9 +45,9 @@ export default function Step2SelectBranch({ onBack, onNext }: Step2SelectBranchP
 
   return (
     <div className="checkout-step">
-      <h2 className="checkout-step-title">Select Pickup Branch</h2>
+      <h2 className="checkout-step-title">Pick a Branch</h2>
       <p className="checkout-step-subtitle">
-        Choose the branch where you&apos;d like to pick up your order. You must select exactly one branch.
+        Where do you want to pick up your order?
       </p>
 
       {error && (

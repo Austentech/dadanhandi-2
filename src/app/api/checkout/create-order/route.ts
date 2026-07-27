@@ -132,12 +132,16 @@ export async function POST(request: Request) {
       }
 
       if (existingOrder.orderStatus === 'failed' || existingOrder.orderStatus === 'cancelled') {
+        // Instead of blocking, generate a fresh idempotency key so the
+        // caller can create a new order. We return a special status code
+        // that the client can detect and retry with a new key.
         return NextResponse.json(
           {
             success: false,
-            message: 'Previous checkout attempt failed. Please start a new checkout.',
+            message: 'STALE_ORDER',
+            needsNewKey: true,
           },
-          { status: 400 },
+          { status: 409 },
         )
       }
 
@@ -218,13 +222,59 @@ export async function POST(request: Request) {
     })
 
     if (!attachResult.success) {
-      // Razorpay order was created but we couldn't attach it. Cancel our order;
-      // the Razorpay order will expire automatically after 15 min of no payment.
-      await cancelDraftOrder(user.id, orderId)
-      return NextResponse.json(
-        { success: false, message: 'Failed to link payment. Please try again.' },
-        { status: 500 },
-      )
+      // RPC failed — possibly because the `attach_razorpay_order_to_order` function
+      // doesn't exist yet (user hasn't run migration 005). Try a direct Supabase
+      // fallback: update orders.razorpay_order_id and insert into payments directly.
+      console.error('[CHECKOUT CREATE-ORDER] attach RPC failed:', attachResult.message, '— trying direct fallback')
+      try {
+        const { createServerClient } = await import('@/lib/supabase/client-server')
+        const supabase = await createServerClient()
+
+        // Update order with razorpay_order_id and set status to awaiting_payment
+        const { error: updateErr } = await supabase
+          .from('orders')
+          .update({
+            razorpay_order_id: rzpResult.data.razorpayOrderId,
+            order_status: 'awaiting_payment',
+          })
+          .eq('id', orderId)
+          .eq('user_id', user.id)
+          .is('order_status', 'draft')
+
+        if (updateErr) {
+          console.error('[CHECKOUT CREATE-ORDER] Direct order update failed:', updateErr.message)
+          await cancelDraftOrder(user.id, orderId)
+          return NextResponse.json(
+            { success: false, message: 'Couldn’t set up payment. Please try again.' },
+            { status: 500 },
+          )
+        }
+
+        // Insert payment row directly
+        const { error: payErr } = await supabase
+          .from('payments')
+          .insert({
+            order_id: orderId,
+            user_id: user.id,
+            razorpay_order_id: rzpResult.data.razorpayOrderId,
+            amount_paise: c.finalAmountPaise,
+            currency: CHECKOUT_CONFIG.currency,
+            status: 'pending',
+          })
+
+        if (payErr) {
+          // Payment insert failed — order is still in awaiting_payment state
+          // which is fine, the payment row is non-critical for the happy path
+          console.error('[CHECKOUT CREATE-ORDER] Direct payment insert failed (non-critical):', payErr.message)
+        }
+      } catch (fallbackErr) {
+        console.error('[CHECKOUT CREATE-ORDER] Direct fallback error:', fallbackErr)
+        await cancelDraftOrder(user.id, orderId)
+        return NextResponse.json(
+          { success: false, message: 'Couldn’t set up payment. Please try again.' },
+          { status: 500 },
+        )
+      }
     }
 
     // 9. Save customer notes (best-effort — non-critical)

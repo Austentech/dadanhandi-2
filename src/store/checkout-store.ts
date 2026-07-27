@@ -413,6 +413,14 @@ export const useCheckoutStore = create<CheckoutStoreState>((set, get) => ({
         return { success: true, message: data.message, data: data.data }
       }
 
+      // Handle stale order (failed/cancelled) — auto-generate a new key and retry once
+      if (data.needsNewKey || data.status === 409) {
+        const newKey = generateIdempotencyKey()
+        set({ idempotencyKey: newKey, isCreatingOrder: false, orderId: null, orderNumber: null, razorpayOrderId: null })
+        // Retry once with the new key
+        return get().createOrder()
+      }
+
       set({ isCreatingOrder: false, error: data.message })
       return { success: false, message: data.message }
     } catch {

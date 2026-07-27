@@ -23,7 +23,7 @@
 
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
@@ -75,20 +75,28 @@ export default function CheckoutPage() {
   }, [isAuthLoading, isAuthenticated, isInitialized, initFromServer, fetchCart])
 
   // ------------------------------------------------------------------------
-  // CLEANUP on unmount: if user abandons checkout at payment step
-  // (order created but not confirmed), cancel the draft order so reward
-  // points are restored.
+  // CLEANUP on unmount: only cancel if user leaves the checkout entirely
+  // (e.g., navigates to /menu). If they just go back a step, preserve the
+  // order so they can retry payment without starting over.
   // ------------------------------------------------------------------------
+  const cleanupRef = useRef(false)
   useEffect(() => {
     return () => {
-      // Only cancel if we have an order ID and we're not on the confirmation step
-      // (i.e., user navigated away before completion)
-      if (orderId && currentStep < 6) {
-        // Best-effort cancel — fire and forget
+      // Only cancel if user is actually leaving checkout (not just going back)
+      if (orderId && currentStep < 6 && cleanupRef.current) {
         cancelOrder(orderId).catch(() => {})
       }
     }
   }, [])
+
+  // Track when user truly navigates away (not step change)
+  useEffect(() => {
+    if (currentStep < 6 && orderId) {
+      cleanupRef.current = true
+    } else {
+      cleanupRef.current = false
+    }
+  }, [currentStep, orderId])
 
   // ------------------------------------------------------------------------
   // HANDLERS
@@ -240,7 +248,7 @@ export default function CheckoutPage() {
       <div className="checkout-container">
         <header className="checkout-header">
           <h1>Checkout</h1>
-          <p>Complete your order in a few simple steps</p>
+          <p>Almost there — just a few steps</p>
         </header>
 
         {currentStep < 6 && <CheckoutProgress currentStep={currentStep} />}

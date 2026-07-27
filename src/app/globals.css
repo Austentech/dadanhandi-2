@@ -3558,11 +3558,20 @@ a, p, span, div {
   color: #fff;
   font-weight: 700;
   font-size: 0.95rem;
-  cursor: not-allowed;
+  cursor: pointer;
   font-family: var(--font-nunito), sans-serif;
   transition: all 0.2s;
   margin-bottom: 8px;
-  opacity: 0.7;
+  opacity: 1;
+}
+
+.cart-checkout-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.cart-checkout-btn:active {
+  transform: translateY(0);
 }
 
 .cart-clear-btn {
@@ -4971,5 +4980,94 @@ a, p, span, div {
   .checkout-btn {
     width: 100%;
     justify-content: center;
+  }
+  .donation-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .reward-quick-btns {
+    flex-wrap: wrap;
+  }
+  .checkout-summary {
+    font-size: 0.85rem;
+  }
+}
+
+/* Extra small screens (iPhone SE 375px) */
+@media (max-width: 400px) {
+  .checkout-page {
+    padding: 12px 8px 80px;
+  }
+  .checkout-step {
+    padding: 16px 12px;
+    border-radius: 10px;
+  }
+  .checkout-step-title {
+    font-size: 1.2rem;
+  }
+  .checkout-step-subtitle {
+    font-size: 0.82rem;
+  }
+  .checkout-progress-circle {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+  .checkout-progress-connector {
+    width: 12px;
+    margin: 0 2px;
+  }
+  .checkout-cart-line {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .checkout-cart-line-emoji {
+    width: 36px;
+    height: 36px;
+    font-size: 1.3rem;
+  }
+  .pickup-slot {
+    padding: 10px 6px;
+    font-size: 0.82rem;
+    min-height: 40px;
+  }
+  .branch-card {
+    padding: 14px 16px;
+  }
+  .branch-card-name {
+    font-size: 1.05rem;
+  }
+  .donation-card {
+    padding: 14px;
+  }
+  .reward-input-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .reward-quick-btns {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+  .checkout-summary {
+    padding: 14px;
+  }
+  .checkout-error-banner {
+    font-size: 0.82rem;
+    padding: 10px 12px;
+  }
+  .payment-error-banner {
+    font-size: 0.82rem;
+    padding: 10px 12px;
+  }
+  .razorpay-method-card {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+  }
+  .checkout-auth-required {
+    padding: 40px 16px;
+  }
+  .confirmation-order-card {
+    padding: 16px;
   }
 }

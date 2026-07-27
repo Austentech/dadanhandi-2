@@ -23,6 +23,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useCheckoutStore } from '@/store/checkout-store'
+import { useCartStore } from '@/store/cart-store'
 import { formatPrice } from '@/lib/pricing'
 import { DONATION_CONFIG, REWARD_CONFIG } from '@/types/checkout'
 
@@ -51,6 +52,7 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
     error,
     setError,
   } = useCheckoutStore()
+  const { cartTotals } = useCartStore()
 
   const [localError, setLocalError] = useState<string | null>(null)
 
@@ -86,14 +88,25 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
     }
   }
 
-  const subtotalDisplay = validatedSubtotalPaise !== null ? formatPrice(validatedSubtotalPaise) : null
-  const finalDisplay = validatedFinalAmountPaise !== null ? formatPrice(validatedFinalAmountPaise) : null
-  const discountDisplay = validatedRewardDiscountPaise !== null && validatedRewardDiscountPaise > 0
-    ? formatPrice(validatedRewardDiscountPaise)
+  // Local computed summary — updates immediately when donations/rewards toggle.
+  // This shows BEFORE the server validates. After validation, the server values override.
+  const subtotalDisplay = validatedSubtotalPaise !== null ? formatPrice(validatedSubtotalPaise) : (cartTotals?.subtotalDisplay ?? null)
+  const localDonationPlantation = donations.plantation ? DONATION_CONFIG.plantationPaise : 0
+  const localDonationHunger = donations.hunger ? DONATION_CONFIG.hungerPaise : 0
+  const localDonationTotal = localDonationPlantation + localDonationHunger
+  const localRewardDiscount = rewardPointsToRedeem > 0 ? (rewardPointsToRedeem / 10) * 500 : 0
+  const localSubtotal = validatedSubtotalPaise ?? cartTotals?.subtotalPaise ?? 0
+  const localTotal = localSubtotal + localDonationTotal - localRewardDiscount
+
+  const donationTotalDisplay = localDonationTotal > 0
+    ? formatPrice(localDonationTotal)
     : null
-  const donationTotalDisplay = (validatedDonationPlantationPaise ?? 0) + (validatedDonationHungerPaise ?? 0) > 0
-    ? formatPrice((validatedDonationPlantationPaise ?? 0) + (validatedDonationHungerPaise ?? 0))
+  const discountDisplay = localRewardDiscount > 0
+    ? formatPrice(localRewardDiscount)
     : null
+  const finalDisplay = validatedFinalAmountPaise !== null
+    ? formatPrice(validatedFinalAmountPaise)
+    : (localTotal > 0 ? formatPrice(localTotal) : null)
 
   const isEligibleForEarn =
     validatedSubtotalPaise !== null &&
@@ -104,7 +117,7 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
     <div className="checkout-step">
       <h2 className="checkout-step-title">Donation & Rewards</h2>
       <p className="checkout-step-subtitle">
-        Optional: contribute to a cause, or redeem your reward points for a discount.
+        Want to chip in for a good cause? Or use your reward points.
       </p>
 
       {(localError || error) && (
@@ -116,7 +129,7 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
 
       {/* DONATIONS */}
       <h3 style={{ fontSize: '1rem', color: 'var(--text-dark)', marginBottom: 10 }}>
-        Contribute to a Cause
+        Chip In
       </h3>
       <div className="donation-grid">
         <div
@@ -143,7 +156,7 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
               </span>
             </div>
             <div className="donation-card-desc">
-              Contribute ₹5 towards tree plantation. Help us make Patna greener, one sapling at a time.
+              Help us plant a sapling in Patna.
             </div>
           </div>
         </div>
@@ -172,7 +185,7 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
               </span>
             </div>
             <div className="donation-card-desc">
-              Contribute ₹10 to feed someone in need. 100% of your donation goes to hunger relief.
+              Your ₹10 goes entirely to feeding someone in need.
             </div>
           </div>
         </div>
@@ -263,13 +276,11 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
           <i className="fas fa-info-circle" aria-hidden="true" style={{ marginRight: 6 }}></i>
           {isEligibleForEarn ? (
             <span>
-              <strong>🎉 You&apos;ll earn 5 reward points</strong> on this order (subtotal &gt; ₹500 + plantation donation selected).
-              Points credited after successful payment.
+              <strong>You&apos;ll earn 5 points</strong> on this order (subtotal over ₹500 + plantation donation selected).
             </span>
           ) : (
             <span>
-              Earn <strong>5 reward points</strong> by selecting Plantation donation with a subtotal above ₹500.
-              Points are credited only after successful payment.
+              Add a plantation donation with orders over ₹500 to earn 5 points.
             </span>
           )}
         </div>

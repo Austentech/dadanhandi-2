@@ -354,12 +354,12 @@ export const CHECKOUT_CONFIG = {
   /** Allowed steps in order. 1-indexed. */
   totalSteps: 6,
   stepNames: [
-    'Review Plate',
-    'Select Branch',
-    'Select Pickup Time',
-    'Donation & Rewards',
+    'Your Plate',
+    'Pick Branch',
+    'Pick Time',
+    'Donations',
     'Payment',
-    'Confirmation',
+    'Done',
   ] as const,
   /** Max customer notes length */
   maxCustomerNotesLength: 500,

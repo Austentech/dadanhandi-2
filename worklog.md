@@ -396,3 +396,34 @@ Stage Summary:
   (Use --force-with-lease instead of --force for safety: refuses to push if remote was updated by someone else since we last fetched.)
 - If --force-with-lease fails (remote has newer commits), user can fall back to `git push origin main --force` after manually verifying no one else pushed.
 - After push succeeds, GitHub Push Protection will no longer trigger because the offending files/commits no longer exist in history.
+
+---
+Task ID: M3-GITHUB-PUSH-PROTECTION-FIX-2
+Agent: Main Agent
+Task: Fix follow-up Push Protection error — after the first history rewrite, the worklog.md file itself contained literal Stripe placeholder strings (because the previous worklog entry had quoted them verbatim when documenting what was wrong). GitHub flagged worklog.md:372 in the new commit. Also extended redaction to cover Razorpay placeholder strings (GitHub also scans for Razorpay keys).
+
+Work Log:
+- Identified that the previous worklog entry literally wrote out the Stripe placeholder patterns (a `sk_test_` prefix followed by 24 placeholder `x` characters, and a `pk_live_` prefix followed by 24 placeholder `x` characters) when documenting what was wrong. These literal strings themselves match GitHub's secret-scanning regex.
+- Edited worklog.md to replace the literal patterns with safe descriptive text ("a `sk_test_` prefix followed by 24 placeholder characters") that does NOT match GitHub's regex.
+- Discovered Razorpay placeholder patterns (`rzp_test_` and `rzp_live_` prefixes followed by placeholder `x` characters) in docs/RAZORPAY_VERCEL_GUIDE.md history — these also match GitHub's secret-scanning regex (Razorpay is one of GitHub's supported secret-scanning providers).
+- Created redaction rules files:
+  - `/home/z/my-project/scripts/stripe-redaction-rules.txt` — maps Stripe placeholder strings to safe replacement labels
+  - `/home/z/my-project/scripts/razorpay-redaction-rules.txt` — maps Razorpay placeholder strings to safe replacement labels
+- Created safety backup tag: `backup-before-redaction` and `backup-before-razorpay-redaction`
+- Ran `git filter-repo --replace-text` twice (once for Stripe rules, once for Razorpay rules):
+  - Each pass parsed 27 commits and rewrote history
+  - All placeholder strings replaced with descriptive labels like `STRIPE_TEST_SECRET_PLACEHOLDER` and `RAZORPAY_TEST_KEY_PLACEHOLDER`
+  - filter-repo removed `origin` remote after each pass (safety measure)
+- Re-added origin remote after both passes
+- Verified ZERO Stripe AND Razorpay placeholder patterns remain in entire git history:
+  `grep -cE "<all stripe+razorpay patterns>" /tmp/git_history_clean.txt` → 0
+- Also verified zero Stripe webhook secret patterns (`whsec_...`)
+
+Stage Summary:
+- BOTH Stripe AND Razorpay placeholder patterns purged from working tree AND entire git history.
+- 27 commits parsed; multiple commit SHAs rewritten.
+- Three safety backup tags preserved: `backup-before-history-rewrite`, `backup-before-redaction`, `backup-before-razorpay-redaction` (for emergency rollback if needed).
+- Local repo is fully clean and ready for force-push.
+- Push command: `git push origin main --force-with-lease`
+  (If that fails, fall back to `git push origin main --force` after manually verifying no one else pushed.)
+- After push succeeds, GitHub Push Protection will no longer trigger.

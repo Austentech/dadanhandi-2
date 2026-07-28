@@ -445,3 +445,26 @@ Stage Summary:
 - Files modified: Step4DonationRewards.tsx, create-order/route.ts, verify-payment/route.ts, CartDrawer.tsx
 - Key insight: "Couldn't set up payment" error was caused by `attach_razorpay_order_to_order` RPC not existing in DB (migration not applied). Made the attachment step non-blocking so payment can proceed regardless.
 - Root cause of missing price on donation page: Step4 read from `useCartStore().cartTotals` which could be null when the checkout page first loads. Added fallback to compute totals from items or checkout store's cart data.
+
+---
+Task ID: account-bugfix-2
+Agent: Main Agent
+Task: Fix 5 account page bugs — profile update error, order history error, ongoing orders error, reward history empty, responsive design
+
+Work Log:
+- Analyzed all 5 account API routes and identified root cause: migration 006 RPCs don't exist on live Supabase, causing all RPC calls to fail with errors
+- Added direct Supabase fallback to ALL 5 API routes (same pattern used for checkout bugfix):
+  1. PUT /api/account/profile — RPC `update_user_profile` → direct `profiles` table update
+  2. GET /api/account/orders — RPC `list_orders_for_user` → direct `orders` table query with filters, branch name lookup, pagination
+  3. GET /api/account/ongoing-orders — RPC `get_ongoing_orders_for_user` → direct `orders` query with `in('order_status', ['confirmed', 'preparing', 'ready_for_pickup'])`
+  4. GET /api/account/rewards — RPCs `get_full_reward_summary` + `list_reward_transactions_for_user` → direct `reward_balance` and `reward_transactions` queries
+  5. GET /api/account/orders/[id] — RPC `get_order_details_for_user` → direct parallel queries for order, items, branch, status history
+- Enhanced responsive CSS: Added @media rules for 360px (very small), 480px (mobile), 600px (small-medium), 769-1024px (tablet)
+- Added focus-visible outlines for accessibility on all interactive account elements
+- Added overflow-x: hidden safety on account-content
+- Build passed successfully with no TypeScript errors
+
+Stage Summary:
+- Files modified: profile/route.ts, orders/route.ts, ongoing-orders/route.ts, rewards/route.ts, orders/[id]/route.ts, globals.css
+- Pattern: Try RPC first → if fails, use direct Supabase query → never return 500 error for missing RPC
+- All account pages (My Account, Order History, Ongoing Orders, Reward History, Order Detail) will now work even without migration 006 applied

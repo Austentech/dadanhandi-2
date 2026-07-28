@@ -5732,4 +5732,116 @@ a, p, span, div {
   .reward-tx-points {
     font-size: 0.9rem;
   }
+
+  /* Profile form responsive */
+  .account-form-input {
+    font-size: 0.85rem;
+    padding: 10px 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Edit/Save buttons responsive */
+  .auth-btn-primary,
+  .account-btn-secondary {
+    font-size: 0.82rem;
+    padding: 9px 16px;
+  }
+
+  /* Ongoing order card responsive */
+  .ongoing-order-card {
+    padding: 14px !important;
+  }
+
+  .pickup-pin-card {
+    padding: 12px !important;
+  }
+
+  .pickup-pin-card div[style*="font-size: 2rem"] {
+    font-size: 1.6rem !important;
+  }
+}
+
+/* ============================================================================
+   ACCOUNT ACCESSIBILITY & EXTRA RESPONSIVE
+   ============================================================================ */
+
+/* Ensure all interactive elements are focusable */
+.account-nav-item:focus-visible,
+.account-order-card:focus-visible,
+.account-pagination-btn:focus-visible,
+.account-edit-btn:focus-visible,
+.account-btn-secondary:focus-visible {
+  outline: 2px solid #7A0C0C;
+  outline-offset: 2px;
+}
+
+/* Account section overflow safety */
+.account-content {
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Ensure reward summary wraps nicely on very small screens */
+@media (max-width: 360px) {
+  .account-reward-stat {
+    min-width: 70px;
+  }
+
+  .account-reward-stat-value {
+    font-size: 0.9rem;
+  }
+
+  .account-reward-stat-label {
+    font-size: 0.7rem;
+  }
+
+  .account-nav-item {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+    gap: 6px;
+  }
+
+  .account-nav-item i {
+    width: 16px;
+    font-size: 0.75rem;
+  }
+
+  .account-tab-header h2 {
+    font-size: 1.2rem !important;
+  }
+
+  .account-reward-card-value {
+    font-size: 1.3rem;
+  }
+}
+
+/* Tablet improvements */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .account-sidebar {
+    width: 180px;
+  }
+
+  .account-nav-item {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .account-reward-summary {
+    gap: 4px;
+    padding: 16px;
+  }
+}
+
+/* Order card arrow should not overlap on small-medium screens */
+@media (max-width: 600px) {
+  .account-order-card {
+    padding: 14px 14px 14px 14px;
+    padding-right: 32px;
+  }
+
+  .account-order-card-arrow {
+    right: 10px;
+    font-size: 0.7rem;
+  }
 }

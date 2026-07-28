@@ -1,51 +1,40 @@
-/**
- * GET /api/account/orders/[id]
- * ---------------------------
- * Get full order details: header + items + branch + status history.
- *
- * Security: Auth + rate limit + ownership via SECURITY DEFINER RPC
- */
+#!/usr/bin/env python3
+"""Fix order detail API to add direct Supabase fallback."""
 
-import { NextResponse } from 'next/server'
-import { checkRateLimit } from '@/lib/security/rate-limiter'
-import { getClientIp } from '@/lib/security/utils'
-import { getAuthenticatedUser } from '@/services/cart-service'
+import os
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const { id: orderId } = await params
-    const { user, error } = await getAuthenticatedUser()
-    if (error || !user) {
-      return NextResponse.json(error?.body, { status: error?.status || 401 })
-    }
+BASE = "/home/z/my-project"
 
-    const ip = await getClientIp()
-    const ipCheck = checkRateLimit(ip, 'account_order_detail', {
-      maxAttempts: 20,
-      windowMs: 60 * 1000,
-      blockDurationMs: 60 * 1000,
+def read_file(path):
+    with open(path, 'r') as f:
+        return f.read()
+
+def write_file(path, content):
+    with open(path, 'w') as f:
+        f.write(content)
+
+detail_path = os.path.join(BASE, "src/app/api/account/orders/[id]/route.ts")
+content = read_file(detail_path)
+
+old_rpc = """    const { data, error: rpcErr } = await supabase.rpc('get_order_details_for_user', {
+      p_user_id: user.id,
+      p_order_id: orderId,
     })
-    if (!ipCheck.allowed) {
+
+    if (rpcErr || !data?.success) {
+      console.error('[ACCOUNT ORDER DETAIL] RPC error:', rpcErr?.message)
       return NextResponse.json(
-        { success: false, message: 'Too many requests. Please slow down.' },
-        { status: 429 },
+        { success: false, message: 'Order not found.' },
+        { status: 404 },
       )
     }
 
-    if (!orderId || orderId.length < 1 || orderId.length > 100) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid order ID.' },
-        { status: 400 },
-      )
-    }
+    return NextResponse.json({
+      success: true,
+      order: data.order,
+    })"""
 
-    const { createServerClient } = await import('@/lib/supabase/client-server')
-    const supabase = await createServerClient()
-
-    // Try RPC first, fall back to direct query
+new_rpc = """    // Try RPC first, fall back to direct query
     const { data: rpcData, error: rpcErr } = await supabase.rpc('get_order_details_for_user', {
       p_user_id: user.id,
       p_order_id: orderId,
@@ -139,12 +128,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       order,
-    })
-  } catch (err) {
-    console.error('[ACCOUNT ORDER DETAIL] Unexpected error:', err)
-    return NextResponse.json(
-      { success: false, message: 'Something went wrong.' },
-      { status: 500 },
-    )
-  }
-}
+    })"""
+
+content = content.replace(old_rpc, new_rpc)
+write_file(detail_path, content)
+print("[OK] Fixed order detail API with direct Supabase fallback")

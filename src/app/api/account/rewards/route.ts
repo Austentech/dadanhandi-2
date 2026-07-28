@@ -58,7 +58,11 @@ export async function GET(request: Request) {
     const { createServerClient } = await import('@/lib/supabase/client-server')
     const supabase = await createServerClient()
 
-    // Fetch both summary and transactions in parallel
+    // Try RPCs first, fall back to direct queries
+    let summary: Record<string, unknown> | null = null
+    let transactions: Array<Record<string, unknown>> = []
+    let pagination = { page: input.page, limit: input.limit, total: 0, totalPages: 0 }
+
     const [summaryRes, transactionsRes] = await Promise.all([
       supabase.rpc('get_full_reward_summary', { p_user_id: user.id }),
       supabase.rpc('list_reward_transactions_for_user', {
@@ -69,18 +73,91 @@ export async function GET(request: Request) {
       }),
     ])
 
-    if (summaryRes.error) {
-      console.error('[ACCOUNT REWARDS] Summary RPC error:', summaryRes.error.message)
+    if (!summaryRes.error && summaryRes.data) {
+      summary = summaryRes.data?.data || null
     }
-    if (transactionsRes.error) {
-      console.error('[ACCOUNT REWARDS] Transactions RPC error:', transactionsRes.error.message)
+    if (!transactionsRes.error && transactionsRes.data) {
+      transactions = transactionsRes.data?.transactions || []
+      pagination = transactionsRes.data?.pagination || pagination
+    }
+
+    // Direct fallback for summary if RPC failed
+    if (!summary) {
+      console.warn('[ACCOUNT REWARDS] Summary RPC not available, using direct query')
+      try {
+        // Lazy init reward_balance row
+        await supabase
+          .from('reward_balance')
+          .upsert({ user_id: user.id }, { onConflict: 'user_id' })
+
+        const { data: balData } = await supabase
+          .from('reward_balance')
+          .select('balance_points, total_earned, total_redeemed')
+          .eq('user_id', user.id)
+          .single()
+
+        if (balData) {
+          const balance = balData.balance_points || 0
+          const redeemableValue = (Math.floor(balance / 10)) * 500
+          summary = {
+            balancePoints: balance,
+            totalEarned: balData.total_earned || 0,
+            totalRedeemed: balData.total_redeemed || 0,
+            redeemableValuePaise: redeemableValue,
+            redeemableValueDisplay: 'Rs ' + (redeemableValue / 100).toString(),
+          }
+        }
+      } catch (e) {
+        console.error('[ACCOUNT REWARDS] Direct summary error:', e)
+      }
+    }
+
+    // Direct fallback for transactions if RPC failed
+    if (transactions.length === 0 && (transactionsRes.error || !transactionsRes.data)) {
+      console.warn('[ACCOUNT REWARDS] Transactions RPC not available, using direct query')
+      try {
+        let txQuery = supabase
+          .from('reward_transactions')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+
+        if (input.type && input.type !== 'all') {
+          txQuery = txQuery.eq('type', input.type)
+        }
+
+        const txOffset = (input.page - 1) * input.limit
+        const { data: txData, error: txErr, count: txCount } = await txQuery
+          .order('created_at', { ascending: false })
+          .range(txOffset, txOffset + input.limit - 1)
+
+        if (!txErr && txData) {
+          transactions = txData.map((tx: Record<string, unknown>) => ({
+            id: tx.id,
+            orderId: tx.order_id,
+            points: tx.points,
+            type: tx.type,
+            reason: tx.reason,
+            balanceAfter: tx.balance_after,
+            createdAt: tx.created_at,
+          }))
+          const total = txCount || 0
+          pagination = {
+            page: input.page,
+            limit: input.limit,
+            total,
+            totalPages: Math.ceil(total / input.limit),
+          }
+        }
+      } catch (e) {
+        console.error('[ACCOUNT REWARDS] Direct transactions error:', e)
+      }
     }
 
     return NextResponse.json({
       success: true,
-      summary: summaryRes.data?.data || null,
-      transactions: transactionsRes.data?.transactions || [],
-      pagination: transactionsRes.data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 },
+      summary,
+      transactions,
+      pagination,
     })
   } catch (err) {
     console.error('[ACCOUNT REWARDS] Unexpected error:', err)

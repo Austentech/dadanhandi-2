@@ -51,7 +51,10 @@ export async function PUT(request: Request) {
     const { createServerClient } = await import('@/lib/supabase/client-server')
     const supabase = await createServerClient()
 
-    const { data, error: rpcErr } = await supabase.rpc('update_user_profile', {
+    // Try RPC first, fall back to direct table update
+    let success = false
+
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('update_user_profile', {
       p_user_id: user.id,
       p_whatsapp_number: input.whatsapp_number === '' ? null : (input.whatsapp_number ?? null),
       p_mobile_number: input.mobile_number,
@@ -60,12 +63,31 @@ export async function PUT(request: Request) {
       p_pincode: input.pincode,
     })
 
-    if (rpcErr || !data?.success) {
-      console.error('[ACCOUNT PROFILE] RPC error:', rpcErr?.message)
-      return NextResponse.json(
-        { success: false, message: 'Unable to update profile. Please try again.' },
-        { status: 500 },
-      )
+    if (!rpcErr && rpcData?.success) {
+      success = true
+    } else {
+      console.warn('[ACCOUNT PROFILE] RPC not available, using direct update:', rpcErr?.message)
+      // Direct table update fallback
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({
+          whatsapp_number: input.whatsapp_number === '' ? null : (input.whatsapp_number ?? null),
+          mobile_number: input.mobile_number,
+          area: input.area,
+          city: input.city,
+          pincode: input.pincode,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('auth_user_id', user.id)
+
+      if (updateErr) {
+        console.error('[ACCOUNT PROFILE] Direct update error:', updateErr.message)
+        return NextResponse.json(
+          { success: false, message: 'Unable to update profile. Please try again.' },
+          { status: 500 },
+        )
+      }
+      success = true
     }
 
     return NextResponse.json({

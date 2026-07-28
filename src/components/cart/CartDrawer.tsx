@@ -159,7 +159,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             <button
               type="button"
               className="cart-drawer-browse-btn"
-              onClick={onClose}
+              onClick={() => {
+                onClose()
+                router.push('/menu')
+              }}
             >
               <i className="fas fa-utensils" style={{ marginRight: 6 }}></i>
               Browse Menu

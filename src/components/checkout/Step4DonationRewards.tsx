@@ -25,6 +25,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useCheckoutStore } from '@/store/checkout-store'
 import { useCartStore } from '@/store/cart-store'
 import { formatPrice } from '@/lib/pricing'
+import { calculateCartTotals } from '@/lib/pricing'
 import { DONATION_CONFIG, REWARD_CONFIG } from '@/types/checkout'
 
 interface Step4DonationRewardsProps {
@@ -49,10 +50,12 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
     validatedDonationHungerPaise,
     validatedRewardDiscountPaise,
     potentialPointsToEarn,
+    cartItems: checkoutCartItems,
+    cartTotals: checkoutCartTotals,
     error,
     setError,
   } = useCheckoutStore()
-  const { cartTotals } = useCartStore()
+  const { totals: cartStoreTotals, items: cartStoreItems } = useCartStore()
 
   const [localError, setLocalError] = useState<string | null>(null)
 
@@ -90,12 +93,21 @@ export default function Step4DonationRewards({ onBack, onNext }: Step4DonationRe
 
   // Local computed summary — updates immediately when donations/rewards toggle.
   // This shows BEFORE the server validates. After validation, the server values override.
-  const subtotalDisplay = validatedSubtotalPaise !== null ? formatPrice(validatedSubtotalPaise) : (cartTotals?.subtotalDisplay ?? null)
+  // Use cartStore totals first, then checkout store totals, then compute from items.
+  const effectiveCartTotals = cartStoreTotals || checkoutCartTotals
+  const effectiveCartItems = cartStoreItems.length > 0 ? cartStoreItems : checkoutCartItems
+  const computedTotals = (!effectiveCartTotals || effectiveCartTotals.subtotalPaise === 0) && effectiveCartItems.length > 0
+    ? calculateCartTotals(effectiveCartItems)
+    : effectiveCartTotals
+
+  const subtotalDisplay = validatedSubtotalPaise !== null
+    ? formatPrice(validatedSubtotalPaise)
+    : (computedTotals?.subtotalDisplay ?? null)
   const localDonationPlantation = donations.plantation ? DONATION_CONFIG.plantationPaise : 0
   const localDonationHunger = donations.hunger ? DONATION_CONFIG.hungerPaise : 0
   const localDonationTotal = localDonationPlantation + localDonationHunger
   const localRewardDiscount = rewardPointsToRedeem > 0 ? (rewardPointsToRedeem / 10) * 500 : 0
-  const localSubtotal = validatedSubtotalPaise ?? cartTotals?.subtotalPaise ?? 0
+  const localSubtotal = validatedSubtotalPaise ?? computedTotals?.subtotalPaise ?? 0
   const localTotal = localSubtotal + localDonationTotal - localRewardDiscount
 
   const donationTotalDisplay = localDonationTotal > 0

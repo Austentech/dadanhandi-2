@@ -5071,3 +5071,665 @@ a, p, span, div {
     padding: 16px;
   }
 }
+
+/* ============================================================================
+   ACCOUNT SECTION — Sidebar, Tabs, Forms, Cards, Pagination
+   ============================================================================ */
+
+.account-section .container-custom {
+  padding: 0 16px;
+}
+
+.account-layout {
+  display: flex;
+  gap: 32px;
+  max-width: 1100px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+/* Sidebar */
+.account-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 80px;
+}
+
+.account-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #7A5030;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.account-nav-item:hover {
+  background: rgba(122, 12, 12, 0.05);
+  color: #7A0C0C;
+}
+
+.account-nav-item.active {
+  background: rgba(122, 12, 12, 0.08);
+  color: #7A0C0C;
+  font-weight: 700;
+}
+
+/* Content */
+.account-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-tab-header {
+  margin-bottom: 20px;
+}
+
+/* Reward Points Card */
+.account-reward-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #FFF8E1, #FFF3E0);
+  border: 1px solid rgba(196, 106, 46, 0.2);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.account-reward-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #C46A2E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-reward-card-icon i {
+  color: #fff;
+  font-size: 1.2rem;
+}
+
+.account-reward-card-label {
+  font-size: 0.8rem;
+  color: #7A5030;
+}
+
+.account-reward-card-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #7A0C0C;
+  font-family: var(--font-playfair), serif;
+}
+
+.account-reward-card-sub {
+  font-size: 0.8rem;
+  color: #C46A2E;
+  margin-top: 2px;
+}
+
+/* Edit Button */
+.account-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border: 1px solid rgba(122, 12, 12, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: #7A0C0C;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.account-edit-btn:hover {
+  background: rgba(122, 12, 12, 0.08);
+  border-color: #7A0C0C;
+}
+
+/* Profile Form */
+.account-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-form-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #7A5030;
+}
+
+.account-form-input {
+  padding: 10px 14px;
+  border: 1px solid rgba(122, 12, 12, 0.15);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #4A2010;
+  background: #fff;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.account-form-input:focus {
+  border-color: #7A0C0C;
+  box-shadow: 0 0 0 3px rgba(122, 12, 12, 0.1);
+}
+
+.account-form-input.error {
+  border-color: #C62828;
+}
+
+.account-form-error {
+  font-size: 0.78rem;
+  color: #C62828;
+  margin-top: 2px;
+}
+
+.account-btn-secondary {
+  padding: 10px 20px;
+  border: 1px solid rgba(122, 12, 12, 0.15);
+  border-radius: 8px;
+  background: transparent;
+  color: #7A5030;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.account-btn-secondary:hover {
+  background: rgba(122, 12, 12, 0.05);
+}
+
+/* Field labels and values */
+.account-field-label {
+  font-size: 0.78rem;
+  color: #7A5030;
+  margin-bottom: 4px;
+}
+
+.account-field-value {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #4A2010;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Filters */
+.account-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.account-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+  flex: 0 1 auto;
+}
+
+.account-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7A5030;
+}
+
+.account-filter-select,
+.account-filter-input {
+  padding: 8px 12px;
+  border: 1px solid rgba(122, 12, 12, 0.15);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #4A2010;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.account-filter-select:focus,
+.account-filter-input:focus {
+  border-color: #7A0C0C;
+}
+
+/* Empty state */
+.account-empty-state {
+  text-align: center;
+  padding: 48px 16px;
+}
+
+.account-empty-state h3 {
+  font-family: var(--font-playfair), serif;
+  font-size: 1.15rem;
+  color: #7A0C0C;
+  margin: 8px 0 4px;
+}
+
+.account-empty-state p {
+  font-size: 0.85rem;
+  color: #7A5030;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* Order Cards */
+.account-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-order-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  border: 1px solid rgba(122, 12, 12, 0.1);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.account-order-card:hover {
+  border-color: rgba(122, 12, 12, 0.25);
+  box-shadow: 0 2px 8px rgba(122, 12, 12, 0.08);
+}
+
+.account-order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.account-order-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(122, 12, 12, 0.1);
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.account-order-card-arrow {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #C46A2E;
+  font-size: 0.75rem;
+}
+
+/* Pagination */
+.account-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(122, 12, 12, 0.1);
+}
+
+.account-pagination-btn {
+  padding: 8px 16px;
+  border: 1px solid rgba(122, 12, 12, 0.15);
+  border-radius: 6px;
+  background: #fff;
+  color: #7A0C0C;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.account-pagination-btn:hover:not(:disabled) {
+  background: rgba(122, 12, 12, 0.08);
+  border-color: #7A0C0C;
+}
+
+.account-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Back Button */
+.account-back-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  color: #7A0C0C;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+  margin-bottom: 16px;
+}
+
+.account-back-btn:hover {
+  color: #C46A2E;
+}
+
+/* Reward Summary */
+.account-reward-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 20px;
+  border: 1px solid rgba(122, 12, 12, 0.1);
+  border-radius: 10px;
+  background: #fff;
+  margin-bottom: 20px;
+}
+
+.account-reward-stat {
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.account-reward-stat-label {
+  font-size: 0.75rem;
+  color: #7A5030;
+  margin-bottom: 4px;
+}
+
+.account-reward-stat-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #4A2010;
+}
+
+.account-reward-stat-divider {
+  width: 1px;
+  background: rgba(122, 12, 12, 0.1);
+  align-self: stretch;
+  margin: 0 12px;
+}
+
+/* Transaction List */
+.account-tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid rgba(122, 12, 12, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.reward-tx-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #fff;
+  border-bottom: 1px solid rgba(122, 12, 12, 0.06);
+  transition: background 0.15s;
+}
+
+.reward-tx-row:last-child {
+  border-bottom: none;
+}
+
+.reward-tx-row:hover {
+  background: rgba(122, 12, 12, 0.02);
+}
+
+.reward-tx-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(122, 12, 12, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.reward-tx-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.reward-tx-reason {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #4A2010;
+}
+
+.reward-tx-date {
+  font-size: 0.78rem;
+  color: #7A5030;
+  margin-top: 2px;
+}
+
+.reward-tx-points {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.reward-tx-balance {
+  font-size: 0.78rem;
+  color: #999;
+  margin-top: 2px;
+  text-align: right;
+}
+
+/* Order Detail */
+.order-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(122, 12, 12, 0.06);
+}
+
+.order-detail-item:last-child {
+  border-bottom: none;
+}
+
+.order-detail-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-detail-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  color: #7A5030;
+}
+
+.order-detail-summary-row.discount {
+  color: #2E7D32;
+}
+
+.order-detail-summary-row.total {
+  padding-top: 8px;
+  border-top: 1px solid rgba(122, 12, 12, 0.15);
+  font-weight: 700;
+  font-size: 1rem;
+  color: #4A2010;
+}
+
+/* Timeline */
+.order-timeline {
+  padding-left: 16px;
+  border-left: 2px solid rgba(122, 12, 12, 0.15);
+}
+
+.order-timeline-item {
+  position: relative;
+  padding: 0 0 24px 24px;
+}
+
+.order-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.order-timeline-dot {
+  position: absolute;
+  left: -27px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #7A0C0C;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px rgba(122, 12, 12, 0.2);
+}
+
+.order-timeline-content {
+  padding-left: 4px;
+}
+
+/* Ongoing Order Card */
+.ongoing-order-card {
+  position: relative;
+}
+
+.pickup-pin-card {
+  transition: all 0.3s;
+}
+
+/* ============================================================================
+   ACCOUNT RESPONSIVE
+   ============================================================================ */
+@media (max-width: 768px) {
+  .account-layout {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .account-sidebar {
+    width: 100%;
+    position: static;
+  }
+
+  .account-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .account-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .account-nav-item {
+    white-space: nowrap;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+  }
+
+  .account-filter-group {
+    min-width: 120px;
+  }
+
+  .account-reward-summary {
+    gap: 8px;
+  }
+
+  .account-reward-stat {
+    min-width: 80px;
+  }
+
+  .account-reward-stat-divider {
+    display: none;
+  }
+
+  .account-reward-stat-value {
+    font-size: 1rem;
+  }
+
+  .account-reward-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px;
+    gap: 8px;
+  }
+
+  .account-reward-card-value {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .account-order-card-header {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .account-order-card-header > div:last-child {
+    text-align: left;
+  }
+
+  .account-order-card-arrow {
+    display: none;
+  }
+
+  .account-order-card-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .account-pagination {
+    gap: 8px;
+  }
+
+  .account-pagination-btn {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+
+  .reward-tx-row {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .reward-tx-points {
+    font-size: 0.9rem;
+  }
+}

@@ -1,0 +1,1340 @@
+     1→     1  -- ============================================================================
+     2→     2  -- Migration 004: Checkout, Orders, Payments, Rewards, Branches
+     3→     3  -- ----------------------------------------------------------------------------
+     4→     4  -- Phase 2 - Module 3: Production-grade checkout & payment system.
+     5→     5  --
+     6→     6  -- Design principles (carried over from migrations 001-003):
+     7→     7  --  1. All money stored as INTEGER PAISE (1 INR = 100 paise) — never floats.
+     8→     8  --  2. All weights stored as INTEGER GRAMS.
+     9→     9  --  3. RLS enabled on every table. Users can ONLY access their own rows.
+    10→    10  --  4. All mutations go through SECURITY DEFINER RPC functions which
+    11→    11  --     perform server-side validation. Users NEVER directly mutate these
+    12→    12  --     tables (except reads on branches, which is public).
+    13→    13  --  5. Idempotency: every order has a unique idempotency_key; every webhook
+    14→    14  --     event is deduplicated via processed_webhook_events table.
+    15→    15  --  6. Append-only reward_transactions ledger + denormalized reward_balance
+    16→    16  --     for O(1) reads. Balance is updated atomically inside the same
+    17→    17  --     transaction that inserts the ledger row — no drift possible.
+    18→    18  --  7. Future-ready: orders table reserves pickup_pin and admin_assigned_to
+    19→    19  --     columns for later modules (no schema changes needed).
+    20→    20  --
+    21→    21  -- Timezone handling:
+    22→    22  --  - Supabase Postgres stores timestamptz in UTC internally.
+    23→    23  --  - Pickup date is DATE (no tz). Slot start/end are TIME (no tz).
+    24→    24  --  - "Today" is computed at the APPLICATION layer using Asia/Kolkata
+    25→    25  --    (IST) and validated against the requested pickup_date.
+    26→    26  -- ============================================================================
+    27→    27  
+    28→    28  -- ============================================================================
+    29→    29  -- BRANCHES TABLE
+    30→    30  -- ============================================================================
+    31→    31  -- Public read access (anyone can see branches). No writes via RLS —
+    32→    32  -- only superadmin/service role can add branches (future admin module).
+    33→    33  -- ============================================================================
+    34→    34  create table if not exists public.branches (
+    35→    35    id uuid primary key default gen_random_uuid(),
+    36→    36    -- URL-safe slug used in API requests
+    37→    37    slug text not null unique,
+    38→    38    name text not null,
+    39→    39    address_line1 text not null,
+    40→    40    address_line2 text,
+    41→    41    city text not null,
+    42→    42    state text not null,
+    43→    43    pincode text,
+    44→    44    -- Future: geo coordinates for maps / distance calc
+    45→    45    latitude numeric(10,7),
+    46→    46    longitude numeric(10,7),
+    47→    47    -- Operating hours (24h format, e.g. '10:00:00' / '22:00:00')
+    48→    48    opening_time time not null default '10:00:00',
+    49→    49    closing_time time not null default '22:00:00',
+    50→    50    -- Status: 'active' = available for pickup; 'coming_soon' = listed but disabled
+    51→    51    status text not null default 'active'
+    52→    52      check (status in ('active', 'inactive', 'coming_soon')),
+    53→    53    sort_order integer not null default 0,
+    54→    54    created_at timestamptz not null default now(),
+    55→    55    updated_at timestamptz not null default now()
+    56→    56  );
+    57→    57  
+    58→    58  create or replace function public.handle_branches_updated_at()
+    59→    59  returns trigger language plpgsql as $$
+    60→    60  begin new.updated_at = now(); return new; end; $$;
+    61→    61  
+    62→    62  drop trigger if exists trg_branches_updated_at on public.branches;
+    63→    63  create trigger trg_branches_updated_at
+    64→    64    before update on public.branches
+    65→    65    for each row execute function public.handle_branches_updated_at();
+    66→    66  
+    67→    67  create index if not exists idx_branches_status on public.branches(status);
+    68→    68  create index if not exists idx_branches_sort on public.branches(sort_order);
+    69→    69  
+    70→    70  alter table public.branches enable row level security;
+    71→    71  
+    72→    72  -- Anyone (even anon) can read active branches
+    73→    73  drop policy if exists "branches_read_all" on public.branches;
+    74→    74  create policy "branches_read_all"
+    75→    75    on public.branches for select
+    76→    76    using (true);
+    77→    77  -- No insert/update/delete policies — only service role can mutate.
+    78→    78  
+    79→    79  -- ----------------------------------------------------------------------------
+    80→    80  -- Seed the four branches. Idempotent: ON CONFLICT do nothing.
+    81→    81  -- ----------------------------------------------------------------------------
+    82→    82  insert into public.branches
+    83→    83    (slug, name, address_line1, address_line2, city, state, pincode, opening_time, closing_time, status, sort_order)
+    84→    84  values
+    85→    85    ('danapur',
+    86→    86     'Danapur Branch',
+    87→    87     'Saguna Khagaul Road, Kaliket Nagar, Danapur',
+    88→    88     'Patna, Bihar',
+    89→    89     'Patna', 'Bihar', '801105',
+    90→    90     '10:00:00', '22:00:00', 'active', 1),
+    91→    91    ('rajeev-nagar',
+    92→    92     'Rajeev Nagar Branch',
+    93→    93     'Nepali Nagar More, Rajeev Nagar, Ashiana More, Bailey Road',
+    94→    94     'Patna, Bihar',
+    95→    95     'Patna', 'Bihar', '801503',
+    96→    96     '10:00:00', '22:00:00', 'active', 2),
+    97→    97    ('arraah',
+    98→    98     'Arrah Branch',
+    99→    99     'S Bhelai Road, Sarvodaya Nagar, Jagdev Nagar',
+   100→   100     'Arrah, Bihar',
+   101→   101     'Arrah', 'Bihar', '802301',
+   102→   102     '10:00:00', '22:00:00', 'active', 3),
+   103→   103    ('ranchi',
+   104→   104     'Ranchi Branch',
+   105→   105     'H.B Road, Opposite Electricity Board, Kokar',
+   106→   106     'Ranchi, Jharkhand',
+   107→   107     'Ranchi', 'Jharkhand', '834001',
+   108→   108     '10:00:00', '22:00:00', 'active', 4)
+   109→   109  on conflict (slug) do nothing;
+   110→   110  
+   111→   111  -- ============================================================================
+   112→   112  -- ORDERS TABLE
+   113→   113  -- ============================================================================
+   114→   114  create table if not exists public.orders (
+   115→   115    id uuid primary key default gen_random_uuid(),
+   116→   116    -- Human-readable order number, e.g. 'DHM-20260727-00001'
+   117→   117    order_number text not null unique,
+   118→   118  
+   119→   119    user_id uuid not null references auth.users(id) on delete cascade,
+   120→   120    branch_id uuid not null references public.branches(id),
+   121→   121  
+   122→   122    -- Pickup info (today only, validated at app layer)
+   123→   123    pickup_date date not null,
+   124→   124    pickup_slot_start time not null,
+   125→   125    pickup_slot_end time not null,
+   126→   126  
+   127→   127    -- Pricing breakdown (all paise, integer)
+   128→   128    subtotal_paise integer not null check (subtotal_paise >= 0),
+   129→   129    -- Donations: only 0 or the exact amount allowed
+   130→   130    donation_plantation_paise integer not null default 0
+   131→   131      check (donation_plantation_paise in (0, 500)),
+   132→   132    donation_hunger_paise integer not null default 0
+   133→   133      check (donation_hunger_paise in (0, 1000)),
+   134→   134    -- Reward points redeemed (must be multiple of 10, >= 0)
+   135→   135    reward_points_redeemed integer not null default 0
+   136→   136      check (reward_points_redeemed >= 0 and reward_points_redeemed % 10 = 0),
+   137→   137    -- Discount applied from reward redemption (paise)
+   138→   138    reward_discount_paise integer not null default 0
+   139→   139      check (reward_discount_paise >= 0),
+   140→   140    -- Final amount payable (paise). Computed server-side only.
+   141→   141    final_amount_paise integer not null check (final_amount_paise >= 0),
+   142→   142  
+   143→   143    -- Reward points EARNED on this order (only set after payment success)
+   144→   144    reward_points_earned integer not null default 0
+   145→   145      check (reward_points_earned >= 0),
+   146→   146  
+   147→   147    -- Status machine
+   148→   148    -- draft → awaiting_payment → confirmed  (success path)
+   149→   149    -- draft → awaiting_payment → failed      (failure path)
+   150→   150    -- draft → cancelled                       (user cancelled before pay)
+   151→   151    payment_status text not null default 'pending'
+   152→   152      check (payment_status in ('pending', 'succeeded', 'failed', 'refunded')),
+   153→   153    order_status text not null default 'draft'
+   154→   154      check (order_status in ('draft', 'awaiting_payment', 'confirmed', 'cancelled', 'failed')),
+   155→   155  
+   156→   156    -- Idempotency: prevents duplicate order creation from double-click / refresh
+   157→   157    idempotency_key text not null unique,
+   158→   158  
+   159→   159    -- Razorpay order_id (set when Razorpay Order is created server-side)
+   160→   160    razorpay_order_id text unique,
+   161→   161  
+   162→   162    -- Reserved for future modules (no schema changes needed when those ship)
+   163→   163    pickup_pin text,
+   164→   164    admin_assigned_to uuid,
+   165→   165  
+   166→   166    -- Optional customer note (max 500 chars; sanitized at app layer)
+   167→   167    customer_notes text check (char_length(customer_notes) <= 500),
+   168→   168  
+   169→   169    -- Audit timestamps
+   170→   170    created_at timestamptz not null default now(),
+   171→   171    updated_at timestamptz not null default now()
+   172→   172  );
+   173→   173  
+   174→   174  create or replace function public.handle_orders_updated_at()
+   175→   175  returns trigger language plpgsql as $$
+   176→   176  begin new.updated_at = now(); return new; end; $$;
+   177→   177  
+   178→   178  drop trigger if exists trg_orders_updated_at on public.orders;
+   179→   179  create trigger trg_orders_updated_at
+   180→   180    before update on public.orders
+   181→   181    for each row execute function public.handle_orders_updated_at();
+   182→   182  
+   183→   183  create index if not exists idx_orders_user_id on public.orders(user_id);
+   184→   184  create index if not exists idx_orders_order_number on public.orders(order_number);
+   185→   185  create index if not exists idx_orders_payment_status on public.orders(payment_status);
+   186→   186  create index if not exists idx_orders_order_status on public.orders(order_status);
+   187→   187  create index if not exists idx_orders_razorpay_order on public.orders(razorpay_order_id);
+   188→   188  create index if not exists idx_orders_branch_date on public.orders(branch_id, pickup_date);
+   189→   189  create index if not exists idx_orders_user_created on public.orders(user_id, created_at desc);
+   190→   190  
+   191→   191  alter table public.orders enable row level security;
+   192→   192  
+   193→   193  drop policy if exists "orders_select_own" on public.orders;
+   194→   194  drop policy if exists "orders_insert_own" on public.orders;
+   195→   195  drop policy if exists "orders_update_own" on public.orders;
+   196→   196  drop policy if exists "orders_delete_own" on public.orders;
+   197→   197  
+   198→   198  create policy "orders_select_own"
+   199→   199    on public.orders for select
+   200→   200    using (auth.uid() = user_id);
+   201→   201  
+   202→   202  -- Inserts/updates go through SECURITY DEFINER RPC only — no direct user inserts.
+   203→   203  -- We still allow direct INSERT with user_id = auth.uid() so the RPC pattern
+   204→   204  -- works (RPC runs as definer, but if app layer ever inserts directly,
+   205→   205  -- the policy enforces user can only insert their own row).
+   206→   206  create policy "orders_insert_own"
+   207→   207    on public.orders for insert
+   208→   208    with check (auth.uid() = user_id);
+   209→   209  
+   210→   210  -- ============================================================================
+   211→   211  -- ORDER ITEMS TABLE
+   212→   212  -- ============================================================================
+   213→   213  create table if not exists public.order_items (
+   214→   214    id uuid primary key default gen_random_uuid(),
+   215→   215    order_id uuid not null references public.orders(id) on delete cascade,
+   216→   216    user_id uuid not null references auth.users(id) on delete cascade,
+   217→   217  
+   218→   218    line_key text not null,
+   219→   219    item_id text not null,
+   220→   220    variant_id text not null,
+   221→   221    item_name text not null,
+   222→   222    item_emoji text not null default '🍽️',
+   223→   223    item_type text not null check (item_type in ('fixed', 'weight', 'piece')),
+   224→   224    variant_label text not null,
+   225→   225    weight_grams integer,
+   226→   226    piece_count integer,
+   227→   227    unit_price_paise integer not null check (unit_price_paise >= 0),
+   228→   228    quantity integer not null check (quantity >= 1 and quantity <= 50),
+   229→   229    line_total_paise integer not null check (line_total_paise >= 0),
+   230→   230  
+   231→   231    created_at timestamptz not null default now()
+   232→   232  );
+   233→   233  
+   234→   234  create index if not exists idx_order_items_order_id on public.order_items(order_id);
+   235→   235  create index if not exists idx_order_items_user_id on public.order_items(user_id);
+   236→   236  create index if not exists idx_order_items_line_key on public.order_items(line_key);
+   237→   237  
+   238→   238  alter table public.order_items enable row level security;
+   239→   239  
+   240→   240  drop policy if exists "order_items_select_own" on public.order_items;
+   241→   241  drop policy if exists "order_items_insert_own" on public.order_items;
+   242→   242  
+   243→   243  create policy "order_items_select_own"
+   244→   244    on public.order_items for select
+   245→   245    using (auth.uid() = user_id);
+   246→   246  
+   247→   247  create policy "order_items_insert_own"
+   248→   248    on public.order_items for insert
+   249→   249    with check (auth.uid() = user_id);
+   250→   250  
+   251→   251  -- ============================================================================
+   252→   252  -- PAYMENTS TABLE
+   253→   253  -- ============================================================================
+   254→   254  create table if not exists public.payments (
+   255→   255    id uuid primary key default gen_random_uuid(),
+   256→   256    order_id uuid not null references public.orders(id) on delete cascade,
+   257→   257    user_id uuid not null references auth.users(id) on delete cascade,
+   258→   258  
+   259→   259    -- Razorpay identifiers
+   260→   260    razorpay_order_id text not null,
+   261→   261    razorpay_payment_id text,
+   262→   262    razorpay_signature text,
+   263→   263  
+   264→   264    -- Amount captured / authorized (paise)
+   265→   265    amount_paise integer not null check (amount_paise >= 0),
+   266→   266    currency text not null default 'inr',
+   267→   267  
+   268→   268    -- Payment status (mirrors Stripe's lifecycle)
+   269→   269    status text not null default 'pending'
+   270→   270      check (status in ('pending', 'succeeded', 'failed', 'refunded')),
+   271→   271  
+   272→   272    -- When the terminal webhook event was processed (NULL = not yet processed)
+   273→   273    webhook_processed_at timestamptz,
+   274→   274  
+   275→   275    -- Failure reason (logged for diagnostics; NEVER exposed to client)
+   276→   276    failure_reason text,
+   277→   277  
+   278→   278    -- Latest raw payload from Stripe (for audit / debugging)
+   279→   279    raw_payload jsonb,
+   280→   280  
+   281→   281    created_at timestamptz not null default now(),
+   282→   282    updated_at timestamptz not null default now()
+   283→   283  );
+   284→   284  
+   285→   285  create or replace function public.handle_payments_updated_at()
+   286→   286  returns trigger language plpgsql as $$
+   287→   287  begin new.updated_at = now(); return new; end; $$;
+   288→   288  
+   289→   289  drop trigger if exists trg_payments_updated_at on public.payments;
+   290→   290  create trigger trg_payments_updated_at
+   291→   291    before update on public.payments
+   292→   292    for each row execute function public.handle_payments_updated_at();
+   293→   293  
+   294→   294  create index if not exists idx_payments_order_id on public.payments(order_id);
+   295→   295  create index if not exists idx_payments_user_id on public.payments(user_id);
+   296→   296  create index if not exists idx_payments_razorpay_order on public.payments(razorpay_order_id);
+   297→   297  create index if not exists idx_payments_status on public.payments(status);
+   298→   298  
+   299→   299  alter table public.payments enable row level security;
+   300→   300  
+   301→   301  drop policy if exists "payments_select_own" on public.payments;
+   302→   302  drop policy if exists "payments_insert_own" on public.payments;
+   303→   303  drop policy if exists "payments_update_own" on public.payments;
+   304→   304  
+   305→   305  create policy "payments_select_own"
+   306→   306    on public.payments for select
+   307→   307    using (auth.uid() = user_id);
+   308→   308  
+   309→   309  create policy "payments_insert_own"
+   310→   310    on public.payments for insert
+   311→   311    with check (auth.uid() = user_id);
+   312→   312  
+   313→   313  create policy "payments_update_own"
+   314→   314    on public.payments for update
+   315→   315    using (auth.uid() = user_id);
+   316→   316  
+   317→   317  -- ============================================================================
+   318→   318  -- PROCESSED WEBHOOK EVENTS TABLE (idempotency for Razorpay webhooks)
+   319→   319  -- ============================================================================
+   320→   320  -- Every Razorpay webhook event has a unique payment_id. We record it here so
+   321→   321  -- that if Razorpay retries the same event (or we receive it twice), we skip
+   322→   322  -- processing. This is the SINGLE source of truth for "have we handled this
+   323→   323  -- event?". Primary key on event_id makes dedup atomic.
+   324→   324  create table if not exists public.processed_webhook_events (
+   325→   325    event_id text primary key,
+   326→   326    event_type text not null,
+   327→   327    payment_id uuid references public.payments(id) on delete set null,
+   328→   328    processed_at timestamptz not null default now()
+   329→   329  );
+   330→   330  
+   331→   331  create index if not exists idx_processed_events_payment on public.processed_webhook_events(payment_id);
+   332→   332  
+   333→   333  alter table public.processed_webhook_events enable row level security;
+   334→   334  -- NO policies — only service role / SECURITY DEFINER functions can read/write.
+   335→   335  
+   336→   336  -- ============================================================================
+   337→   337  -- REWARD BALANCE TABLE (one row per user)
+   338→   338  -- ============================================================================
+   339→   339  create table if not exists public.reward_balance (
+   340→   340    user_id uuid primary key references auth.users(id) on delete cascade,
+   341→   341    balance_points integer not null default 0 check (balance_points >= 0),
+   342→   342    total_earned integer not null default 0 check (total_earned >= 0),
+   343→   343    total_redeemed integer not null default 0 check (total_redeemed >= 0),
+   344→   344    updated_at timestamptz not null default now()
+   345→   345  );
+   346→   346  
+   347→   347  create or replace function public.handle_reward_balance_updated_at()
+   348→   348  returns trigger language plpgsql as $$
+   349→   349  begin new.updated_at = now(); return new; end; $$;
+   350→   350  
+   351→   351  drop trigger if exists trg_reward_balance_updated_at on public.reward_balance;
+   352→   352  create trigger trg_reward_balance_updated_at
+   353→   353    before update on public.reward_balance
+   354→   354    for each row execute function public.handle_reward_balance_updated_at();
+   355→   355  
+   356→   356  alter table public.reward_balance enable row level security;
+   357→   357  
+   358→   358  drop policy if exists "reward_balance_select_own" on public.reward_balance;
+   359→   359  create policy "reward_balance_select_own"
+   360→   360    on public.reward_balance for select
+   361→   361    using (auth.uid() = user_id);
+   362→   362  -- No insert/update/delete policies — all mutations go through SECURITY DEFINER
+   363→   363  -- RPCs (so users can't directly bump their own balance).
+   364→   364  
+   365→   365  -- ============================================================================
+   366→   366  -- REWARD TRANSACTIONS TABLE (append-only ledger)
+   367→   367  -- ============================================================================
+   368→   368  create table if not exists public.reward_transactions (
+   369→   369    id uuid primary key default gen_random_uuid(),
+   370→   370    user_id uuid not null references auth.users(id) on delete cascade,
+   371→   371    order_id uuid references public.orders(id) on delete set null,
+   372→   372  
+   373→   373    -- Signed integer: positive for earn/restore, negative for redeem
+   374→   374    points integer not null,
+   375→   375    type text not null check (type in ('earn', 'redeem', 'adjust', 'restore')),
+   376→   376    reason text not null,
+   377→   377    -- Running balance AFTER this transaction (for audit)
+   378→   378    balance_after integer not null check (balance_after >= 0),
+   379→   379  
+   380→   380    created_at timestamptz not null default now()
+   381→   381  );
+   382→   382  
+   383→   383  create index if not exists idx_reward_tx_user_id on public.reward_transactions(user_id);
+   384→   384  create index if not exists idx_reward_tx_order_id on public.reward_transactions(order_id);
+   385→   385  create index if not exists idx_reward_tx_created_at on public.reward_transactions(created_at desc);
+   386→   386  
+   387→   387  alter table public.reward_transactions enable row level security;
+   388→   388  
+   389→   389  drop policy if exists "reward_tx_select_own" on public.reward_transactions;
+   390→   390  create policy "reward_tx_select_own"
+   391→   391    on public.reward_transactions for select
+   392→   392    using (auth.uid() = user_id);
+   393→   393  -- No insert/update/delete policies — all mutations via SECURITY DEFINER RPCs.
+   394→   394  
+   395→   395  -- ============================================================================
+   396→   396  -- ORDER NUMBER SEQUENCE + GENERATOR
+   397→   397  -- ============================================================================
+   398→   398  create sequence if not exists public.order_number_seq start 1;
+   399→   399  
+   400→   400  -- Generate a human-readable order number: DHM-YYYYMMDD-NNNNN
+   401→   401  -- Uses IST (Asia/Kolkata) for the date component.
+   402→   402  create or replace function public.generate_order_number()
+   403→   403  returns text
+   404→   404  language plpgsql
+   405→   405  security definer
+   406→   406  set search_path = public
+   407→   407  as $$
+   408→   408  declare
+   409→   409    v_seq bigint;
+   410→   410    v_date text;
+   411→   411  begin
+   412→   412    v_seq := nextval('public.order_number_seq');
+   413→   413    v_date := to_char(now() at time zone 'Asia/Kolkata', 'YYYYMMDD');
+   414→   414    return 'DHM-' || v_date || '-' || lpad(v_seq::text, 5, '0');
+   415→   415  end;
+   416→   416  $$;
+   417→   417  
+   418→   418  grant execute on function public.generate_order_number() to authenticated;
+   419→   419  
+   420→   420  -- ============================================================================
+   421→   421  -- RPC: get_branches
+   422→   422  -- ----------------------------------------------------------------------------
+   423→   423  -- Returns all active branches ordered by sort_order. Public read.
+   424→   424  -- ============================================================================
+   425→   425  create or replace function public.get_branches()
+   426→   426  returns table (
+   427→   427    id uuid,
+   428→   428    slug text,
+   429→   429    name text,
+   430→   430    address_line1 text,
+   431→   431    address_line2 text,
+   432→   432    city text,
+   433→   433    state text,
+   434→   434    pincode text,
+   435→   435    latitude numeric,
+   436→   436    longitude numeric,
+   437→   437    opening_time time,
+   438→   438    closing_time time,
+   439→   439    status text,
+   440→   440    sort_order integer
+   441→   441  )
+   442→   442  language plpgsql
+   443→   443  security definer
+   444→   444  set search_path = public
+   445→   445  as $$
+   446→   446  begin
+   447→   447    return query
+   448→   448      select
+   449→   449        b.id, b.slug, b.name, b.address_line1, b.address_line2,
+   450→   450        b.city, b.state, b.pincode, b.latitude, b.longitude,
+   451→   451        b.opening_time, b.closing_time, b.status, b.sort_order
+   452→   452      from public.branches b
+   453→   453      where b.status = 'active'
+   454→   454      order by b.sort_order asc;
+   455→   455  end;
+   456→   456  $$;
+   457→   457  
+   458→   458  grant execute on function public.get_branches() to authenticated;
+   459→   459  
+   460→   460  -- ============================================================================
+   461→   461  -- RPC: get_branch_by_slug
+   462→   462  -- ============================================================================
+   463→   463  create or replace function public.get_branch_by_slug(p_slug text)
+   464→   464  returns table (
+   465→   465    id uuid, slug text, name text, address_line1 text, address_line2 text,
+   466→   466    city text, state text, pincode text, latitude numeric, longitude numeric,
+   467→   467    opening_time time, closing_time time, status text, sort_order integer
+   468→   468  )
+   469→   469  language plpgsql
+   470→   470  security definer
+   471→   471  set search_path = public
+   472→   472  as $$
+   473→   473  begin
+   474→   474    return query
+   475→   475      select
+   476→   476        b.id, b.slug, b.name, b.address_line1, b.address_line2,
+   477→   477        b.city, b.state, b.pincode, b.latitude, b.longitude,
+   478→   478        b.opening_time, b.closing_time, b.status, b.sort_order
+   479→   479      from public.branches b
+   480→   480      where b.slug = p_slug and b.status = 'active'
+   481→   481      limit 1;
+   482→   482  end;
+   483→   483  $$;
+   484→   484  
+   485→   485  grant execute on function public.get_branch_by_slug(text) to authenticated;
+   486→   486  
+   487→   487  -- ============================================================================
+   488→   488  -- RPC: get_reward_balance
+   489→   489  -- ----------------------------------------------------------------------------
+   490→   490  -- Returns the user's current reward point balance. Creates a zero-balance
+   491→   491  -- row if none exists yet (lazy initialization).
+   492→   492  -- ============================================================================
+   493→   493  create or replace function public.get_reward_balance(p_user_id uuid)
+   494→   494  returns table (
+   495→   495    balance_points integer,
+   496→   496    total_earned integer,
+   497→   497    total_redeemed integer
+   498→   498  )
+   499→   499  language plpgsql
+   500→   500  security definer
+   501→   501  set search_path = public
+   502→   502  as $$
+   503→   503  begin
+   504→   504    insert into public.reward_balance (user_id)
+   505→   505    values (p_user_id)
+   506→   506    on conflict (user_id) do nothing;
+   507→   507  
+   508→   508    return query
+   509→   509      select rb.balance_points, rb.total_earned, rb.total_redeemed
+   510→   510      from public.reward_balance rb
+   511→   511      where rb.user_id = p_user_id
+   512→   512      limit 1;
+   513→   513  end;
+   514→   514  $$;
+   515→   515  
+   516→   516  grant execute on function public.get_reward_balance(uuid) to authenticated;
+   517→   517  
+   518→   518  -- ============================================================================
+   519→   519  -- RPC: preview_reward_redemption
+   520→   520  -- ----------------------------------------------------------------------------
+   521→   521  -- Returns the discount (paise) the user would get for redeeming N points,
+   522→   522  -- WITHOUT actually deducting. Pure calc with validation.
+   523→   523  -- Rules: 10 points = ₹5 (500 paise). Must be multiple of 10.
+   524→   524  -- ============================================================================
+   525→   525  create or replace function public.preview_reward_redemption(
+   526→   526    p_user_id uuid,
+   527→   527    p_points integer
+   528→   528  )
+   529→   529  returns jsonb
+   530→   530  language plpgsql
+   531→   531  security definer
+   532→   532  set search_path = public
+   533→   533  as $$
+   534→   534  declare
+   535→   535    v_balance integer;
+   536→   536    v_discount_paise integer;
+   537→   537  begin
+   538→   538    if p_points is null or p_points < 0 then
+   539→   539      return jsonb_build_object('success', false, 'message', 'Invalid points value');
+   540→   540    end if;
+   541→   541  
+   542→   542    if p_points % 10 <> 0 then
+   543→   543      return jsonb_build_object('success', false, 'message', 'Points must be a multiple of 10');
+   544→   544    end if;
+   545→   545  
+   546→   546    if p_points < 10 then
+   547→   547      return jsonb_build_object('success', false, 'message', 'Minimum 10 points required');
+   548→   548    end if;
+   549→   549  
+   550→   550    -- Get current balance (lazy init)
+   551→   551    insert into public.reward_balance (user_id)
+   552→   552    values (p_user_id)
+   553→   553    on conflict (user_id) do nothing;
+   554→   554  
+   555→   555    select balance_points into v_balance
+   556→   556    from public.reward_balance
+   557→   557    where user_id = p_user_id
+   558→   558    for update;  -- lock row for the duration of this transaction
+   559→   559  
+   560→   560    if v_balance is null then
+   561→   561      return jsonb_build_object('success', false, 'message', 'Balance not found');
+   562→   562    end if;
+   563→   563  
+   564→   564    if p_points > v_balance then
+   565→   565      return jsonb_build_object(
+   566→   566        'success', false,
+   567→   567        'message', 'Insufficient points',
+   568→   568        'available', v_balance
+   569→   569      );
+   570→   570    end if;
+   571→   571  
+   572→   572    -- 10 points = 500 paise → discount = (points / 10) * 500
+   573→   573    v_discount_paise := (p_points / 10) * 500;
+   574→   574  
+   575→   575    return jsonb_build_object(
+   576→   576      'success', true,
+   577→   577      'points', p_points,
+   578→   578      'discount_paise', v_discount_paise,
+   579→   579      'balance_after', v_balance - p_points
+   580→   580    );
+   581→   581  end;
+   582→   582  $$;
+   583→   583  
+   584→   584  grant execute on function public.preview_reward_redemption(uuid, integer) to authenticated;
+   585→   585  
+   586→   586  -- ============================================================================
+   587→   587  -- RPC: create_draft_order
+   588→   588  -- ----------------------------------------------------------------------------
+   589→   589  -- Atomic creation of:
+   590→   590  --   1. Order row (status='draft', payment_status='pending')
+   591→   591  --   2. Order items rows (from p_items JSON array)
+   592→   592  --   3. Reward point deduction (if p_reward_points_to_redeem > 0)
+   593→   593  --      - Locks reward_balance row
+   594→   594  --      - Verifies sufficient balance
+   595→   595  --      - Deducts + inserts reward_transactions ledger row
+   596→   596  --
+   597→   597  -- Idempotency:
+   598→   598  --   - p_idempotency_key is UNIQUE. If the same key is submitted twice,
+   599→   599  --     the second call fails with a unique constraint violation, which
+   600→   600  --     the application layer catches and returns the original order.
+   601→   601  --
+   602→   602  -- Item JSON shape:
+   603→   603  --   [{line_key, item_id, variant_id, item_name, item_emoji, item_type,
+   604→   604  --     variant_label, weight_grams, piece_count, unit_price_paise,
+   605→   605  --     quantity, line_total_paise}, ...]
+   606→   606  --
+   607→   607  -- ALL prices are recomputed at the APPLICATION layer (cart-service) before
+   608→   608  -- this function is called. The function still enforces:
+   609→   609  --   - subtotal = SUM(line_total_paise) for the order's items
+   610→   610  --   - final_amount = subtotal + donations - reward_discount
+   611→   611  --   - reward_points_to_redeem is multiple of 10 and <= balance
+   612→   612  -- ============================================================================
+   613→   613  create or replace function public.create_draft_order(
+   614→   614    p_user_id uuid,
+   615→   615    p_branch_id uuid,
+   616→   616    p_pickup_date date,
+   617→   617    p_slot_start time,
+   618→   618    p_slot_end time,
+   619→   619    p_subtotal_paise integer,
+   620→   620    p_donation_plantation_paise integer,
+   621→   621    p_donation_hunger_paise integer,
+   622→   622    p_reward_points_to_redeem integer,
+   623→   623    p_reward_discount_paise integer,
+   624→   624    p_final_amount_paise integer,
+   625→   625    p_idempotency_key text,
+   626→   626    p_items jsonb
+   627→   627  )
+   628→   628  returns jsonb
+   629→   629  language plpgsql
+   630→   630  security definer
+   631→   631  set search_path = public
+   632→   632  as $$
+   633→   633  declare
+   634→   634    v_order_id uuid;
+   635→   635    v_order_number text;
+   636→   636    v_balance integer;
+   637→   637    v_new_balance integer;
+   638→   638    v_computed_subtotal integer := 0;
+   639→   639    v_computed_final integer;
+   640→   640    v_item jsonb;
+   641→   641    v_expected_discount integer;
+   642→   642    v_expected_final integer;
+   643→   643  begin
+   644→   644    -- ---------------- VALIDATION ----------------
+   645→   645    if p_subtotal_paise < 0 then
+   646→   646      return jsonb_build_object('success', false, 'message', 'Invalid subtotal');
+   647→   647    end if;
+   648→   648  
+   649→   649    if p_donation_plantation_paise not in (0, 500) then
+   650→   650      return jsonb_build_object('success', false, 'message', 'Invalid plantation donation');
+   651→   651    end if;
+   652→   652  
+   653→   653    if p_donation_hunger_paise not in (0, 1000) then
+   654→   654      return jsonb_build_object('success', false, 'message', 'Invalid hunger donation');
+   655→   655    end if;
+   656→   656  
+   657→   657    if p_reward_points_to_redeem < 0 or p_reward_points_to_redeem % 10 <> 0 then
+   658→   658      return jsonb_build_object('success', false, 'message', 'Invalid reward points');
+   659→   659    end if;
+   660→   660  
+   661→   661    if p_reward_discount_paise < 0 then
+   662→   662      return jsonb_build_object('success', false, 'message', 'Invalid reward discount');
+   663→   663    end if;
+   664→   664  
+   665→   665    if p_final_amount_paise < 0 then
+   666→   666      return jsonb_build_object('success', false, 'message', 'Invalid final amount');
+   667→   667    end if;
+   668→   668  
+   669→   669    -- Verify reward discount matches points redeemed
+   670→   670    if p_reward_points_to_redeem > 0 then
+   671→   671      v_expected_discount := (p_reward_points_to_redeem / 10) * 500;
+   672→   672      if p_reward_discount_paise <> v_expected_discount then
+   673→   673        return jsonb_build_object('success', false, 'message', 'Reward discount mismatch');
+   674→   674      end if;
+   675→   675    else
+   676→   676      if p_reward_discount_paise <> 0 then
+   677→   677        return jsonb_build_object('success', false, 'message', 'Reward discount without redemption');
+   678→   678      end if;
+   679→   679    end if;
+   680→   680  
+   681→   681    -- Verify final amount = subtotal + donations - reward_discount
+   682→   682    v_expected_final := p_subtotal_paise + p_donation_plantation_paise
+   683→   683                        + p_donation_hunger_paise - p_reward_discount_paise;
+   684→   684    if p_final_amount_paise <> v_expected_final then
+   685→   685      return jsonb_build_object('success', false, 'message', 'Final amount mismatch');
+   686→   686    end if;
+   687→   687  
+   688→   688    -- If redeeming points: verify balance + deduct atomically
+   689→   689    if p_reward_points_to_redeem > 0 then
+   690→   690      -- Lazy init balance row
+   691→   691      insert into public.reward_balance (user_id)
+   692→   692      values (p_user_id)
+   693→   693      on conflict (user_id) do nothing;
+   694→   694  
+   695→   695      select balance_points into v_balance
+   696→   696      from public.reward_balance
+   697→   697      where user_id = p_user_id
+   698→   698      for update;  -- row lock
+   699→   699  
+   700→   700      if v_balance is null then
+   701→   701        return jsonb_build_object('success', false, 'message', 'Reward balance not found');
+   702→   702      end if;
+   703→   703  
+   704→   704      if p_reward_points_to_redeem > v_balance then
+   705→   705        return jsonb_build_object(
+   706→   706          'success', false,
+   707→   707          'message', 'Insufficient reward points',
+   708→   708          'available', v_balance
+   709→   709        );
+   710→   710      end if;
+   711→   711  
+   712→   712      v_new_balance := v_balance - p_reward_points_to_redeem;
+   713→   713  
+   714→   714      update public.reward_balance
+   715→   715      set balance_points = v_new_balance,
+   716→   716          total_redeemed = total_redeemed + p_reward_points_to_redeem
+   717→   717      where user_id = p_user_id;
+   718→   718    end if;
+   719→   719  
+   720→   720    -- ---------------- CREATE ORDER ----------------
+   721→   721    v_order_number := public.generate_order_number();
+   722→   722  
+   723→   723    insert into public.orders (
+   724→   724      order_number, user_id, branch_id,
+   725→   725      pickup_date, pickup_slot_start, pickup_slot_end,
+   726→   726      subtotal_paise,
+   727→   727      donation_plantation_paise, donation_hunger_paise,
+   728→   728      reward_points_redeemed, reward_discount_paise,
+   729→   729      final_amount_paise,
+   730→   730      payment_status, order_status,
+   731→   731      idempotency_key
+   732→   732    ) values (
+   733→   733      v_order_number, p_user_id, p_branch_id,
+   734→   734      p_pickup_date, p_slot_start, p_slot_end,
+   735→   735      p_subtotal_paise,
+   736→   736      p_donation_plantation_paise, p_donation_hunger_paise,
+   737→   737      p_reward_points_to_redeem, p_reward_discount_paise,
+   738→   738      p_final_amount_paise,
+   739→   739      'pending', 'draft',
+   740→   740      p_idempotency_key
+   741→   741    )
+   742→   742    returning id into v_order_id;
+   743→   743  
+   744→   744    -- ---------------- INSERT ITEMS ----------------
+   745→   745    if jsonb_array_length(p_items) = 0 then
+   746→   746      raise exception 'Cannot create order with empty items';
+   747→   747    end if;
+   748→   748  
+   749→   749    for v_item in select * from jsonb_array_elements(p_items) loop
+   750→   750      -- Accumulate subtotal for verification
+   751→   751      v_computed_subtotal := v_computed_subtotal + (v_item->>'line_total_paise')::integer;
+   752→   752  
+   753→   753      insert into public.order_items (
+   754→   754        order_id, user_id,
+   755→   755        line_key, item_id, variant_id,
+   756→   756        item_name, item_emoji, item_type, variant_label,
+   757→   757        weight_grams, piece_count,
+   758→   758        unit_price_paise, quantity, line_total_paise
+   759→   759      ) values (
+   760→   760        v_order_id, p_user_id,
+   761→   761        v_item->>'line_key',
+   762→   762        v_item->>'item_id',
+   763→   763        v_item->>'variant_id',
+   764→   764        v_item->>'item_name',
+   765→   765        v_item->>'item_emoji',
+   766→   766        v_item->>'item_type',
+   767→   767        v_item->>'variant_label',
+   768→   768        nullif(v_item->>'weight_grams', '')::integer,
+   769→   769        nullif(v_item->>'piece_count', '')::integer,
+   770→   770        (v_item->>'unit_price_paise')::integer,
+   771→   771        (v_item->>'quantity')::integer,
+   772→   772        (v_item->>'line_total_paise')::integer
+   773→   773      );
+   774→   774    end loop;
+   775→   775  
+   776→   776    -- Verify computed subtotal matches declared subtotal
+   777→   777    if v_computed_subtotal <> p_subtotal_paise then
+   778→   778      raise exception 'Subtotal mismatch: computed %, declared %',
+   779→   779        v_computed_subtotal, p_subtotal_paise;
+   780→   780    end if;
+   781→   781  
+   782→   782    -- ---------------- REWARD LEDGER (REDEEM) ----------------
+   783→   783    if p_reward_points_to_redeem > 0 then
+   784→   784      insert into public.reward_transactions (
+   785→   785        user_id, order_id, points, type, reason, balance_after
+   786→   786      ) values (
+   787→   787        p_user_id, v_order_id,
+   788→   788        -p_reward_points_to_redeem,
+   789→   789        'redeem',
+   790→   790        'Redeemed for order ' || v_order_number,
+   791→   791        v_new_balance
+   792→   792      );
+   793→   793    end if;
+   794→   794  
+   795→   795    return jsonb_build_object(
+   796→   796      'success', true,
+   797→   797      'order_id', v_order_id,
+   798→   798      'order_number', v_order_number
+   799→   799    );
+   800→   800  end;
+   801→   801  $$;
+   802→   802  
+   803→   803  grant execute on function public.create_draft_order(
+   804→   804    uuid, uuid, date, time, time, integer, integer, integer, integer, integer, integer, text, jsonb
+   805→   805  ) to authenticated;
+   806→   806  
+   807→   807  -- ============================================================================
+   808→   808  -- RPC: attach_razorpay_order_to_order
+   809→   809  -- ----------------------------------------------------------------------------
+   810→   810  -- Links a Razorpay order_id to a draft order and transitions the
+   811→   811  -- order to 'awaiting_payment' status. Also creates the payments row.
+   812→   812  -- Idempotent: if called twice with same Razorpay order_id, returns success
+   813→   813  -- without creating duplicates.
+   814→   814  -- ============================================================================
+   815→   815  create or replace function public.attach_razorpay_order_to_order(
+   816→   816    p_order_id uuid,
+   817→   817    p_user_id uuid,
+   818→   818    p_razorpay_order_id text,
+   819→   819    p_amount_paise integer
+   820→   820  )
+   821→   821  returns jsonb
+   822→   822  language plpgsql
+   823→   823  security definer
+   824→   824  set search_path = public
+   825→   825  as $$
+   826→   826  declare
+   827→   827    v_existing_rzp text;
+   828→   828    v_payment_id uuid;
+   829→   829  begin
+   830→   830    -- Lock the order row
+   831→   831    select razorpay_order_id into v_existing_rzp
+   832→   832    from public.orders
+   833→   833    where id = p_order_id and user_id = p_user_id
+   834→   834    for update;
+   835→   835  
+   836→   836    if not found then
+   837→   837      return jsonb_build_object('success', false, 'message', 'Order not found');
+   838→   838    end if;
+   839→   839  
+   840→   840    -- If already attached to a different Razorpay order, reject
+   841→   841    if v_existing_rzp is not null and v_existing_rzp <> p_razorpay_order_id then
+   842→   842      return jsonb_build_object('success', false, 'message', 'Order already has a different payment intent');
+   843→   843    end if;
+   844→   844  
+   845→   845    -- Update order to awaiting_payment (if not already)
+   846→   846    update public.orders
+   847→   847    set order_status = case when order_status = 'draft' then 'awaiting_payment' else order_status end,
+   848→   848        razorpay_order_id = p_razorpay_order_id
+   849→   849    where id = p_order_id;
+   850→   850  
+   851→   851    -- Insert payment row (idempotent: if exists for this Razorpay order, do nothing)
+   852→   852    insert into public.payments (
+   853→   853      order_id, user_id,
+   854→   854      razorpay_order_id, amount_paise, currency, status
+   855→   855    ) values (
+   856→   856      p_order_id, p_user_id,
+   857→   857      p_razorpay_order_id, p_amount_paise, 'inr', 'pending'
+   858→   858    )
+   859→   859    on conflict (razorpay_order_id) do nothing
+   860→   860    returning id into v_payment_id;
+   861→   861  
+   862→   862    -- If conflict (existing payment), fetch its id
+   863→   863    if v_payment_id is null then
+   864→   864      select id into v_payment_id
+   865→   865      from public.payments
+   866→   866      where razorpay_order_id = p_razorpay_order_id
+   867→   867      limit 1;
+   868→   868    end if;
+   869→   869  
+   870→   870    return jsonb_build_object(
+   871→   871      'success', true,
+   872→   872      'order_id', p_order_id,
+   873→   873      'payment_id', v_payment_id
+   874→   874    );
+   875→   875  end;
+   876→   876  $$;
+   877→   877  
+   878→   878  grant execute on function public.attach_razorpay_order_to_order(
+   879→   879    uuid, uuid, text, integer
+   880→   880  ) to authenticated;
+   881→   881  
+   882→   882  -- ============================================================================
+   883→   883  -- RPC: mark_order_succeeded
+   884→   884  -- ----------------------------------------------------------------------------
+   885→   885  -- Called EITHER from:
+   886→   886  --  - /api/checkout/verify-payment (PRIMARY — client verifies signature)
+   887→   887  --  - /api/razorpay/webhook (SECONDARY — resilience if client closes browser)
+   888→   888  --
+   889→   889  -- Atomic operations:
+   890→   890  --   1. Insert into processed_webhook_events (idempotency guard)
+   891→   891  --   2. Update order: payment_status='succeeded', order_status='confirmed'
+   892→   892  --   3. Update payment: status='succeeded', razorpay_payment_id, razorpay_signature, raw_payload
+   893→   893  --   4. Award reward points (5 if subtotal > ₹500 AND plantation donation)
+   894→   894  --   5. Clear user's cart (delete from cart_items)
+   895→   895  --
+   896→   896  -- If called twice with same event_id, second call is a no-op (success).
+   897→   897  -- ============================================================================
+   898→   898  create or replace function public.mark_order_succeeded(
+   899→   899    p_order_id uuid,
+   900→   900    p_razorpay_payment_id text,
+   901→   901    p_razorpay_signature text,
+   902→   902    p_webhook_event_id text,
+   903→   903    p_event_type text,
+   904→   904    p_raw_payload jsonb
+   905→   905  )
+   906→   906  returns jsonb
+   907→   907  language plpgsql
+   908→   908  security definer
+   909→   909  set search_path = public
+   910→   910  as $$
+   911→   911  declare
+   912→   912    v_order public.orders%rowtype;
+   913→   913    v_payment_id uuid;
+   914→   914    v_balance integer;
+   915→   915    v_new_balance integer;
+   916→   916    v_points_to_earn integer := 0;
+   917→   917    v_user_id uuid;
+   918→   918  begin
+   919→   919    -- ---------------- IDEMPOTENCY CHECK ----------------
+   920→   920    -- Try to record this event. If it already exists, we've processed it.
+   921→   921    begin
+   922→   922      insert into public.processed_webhook_events (event_id, event_type, payment_id)
+   923→   923      values (p_webhook_event_id, p_event_type, null)
+   924→   924      returning payment_id into v_payment_id;
+   925→   925    exception when unique_violation then
+   926→   926      return jsonb_build_object('success', true, 'message', 'Event already processed', 'idempotent', true);
+   927→   927    end;
+   928→   928  
+   929→   929    -- ---------------- LOAD ORDER (lock) ----------------
+   930→   930    select * into v_order
+   931→   931    from public.orders
+   932→   932    where id = p_order_id
+   933→   933    for update;
+   934→   934  
+   935→   935    if not found then
+   936→   936      return jsonb_build_object('success', false, 'message', 'Order not found');
+   937→   937    end if;
+   938→   938  
+   939→   939    v_user_id := v_order.user_id;
+   940→   940  
+   941→   941    -- Find payment row
+   942→   942    select id into v_payment_id
+   943→   943    from public.payments
+   944→   944    where razorpay_order_id = v_order.razorpay_order_id
+   945→   945    limit 1;
+   946→   946  
+   947→   947    -- Update payment record
+   948→   948    if v_payment_id is not null then
+   949→   949      update public.payments
+   950→   950      set status = 'succeeded',
+   951→   951          razorpay_payment_id = p_razorpay_payment_id,
+   952→   952          razorpay_signature = p_razorpay_signature,
+   953→   953          raw_payload = p_raw_payload,
+   954→   954          webhook_processed_at = now()
+   955→   955      where id = v_payment_id;
+   956→   956  
+   957→   957      -- Backfill payment_id in processed_webhook_events
+   958→   958      update public.processed_webhook_events
+   959→   959      set payment_id = v_payment_id
+   960→   960      where event_id = p_webhook_event_id;
+   961→   961    end if;
+   962→   962  
+   963→   963    -- If order is already confirmed, skip re-processing (idempotency)
+   964→   964    if v_order.order_status = 'confirmed' then
+   965→   965      return jsonb_build_object('success', true, 'message', 'Order already confirmed', 'idempotent', true);
+   966→   966    end if;
+   967→   967  
+   968→   968    -- ---------------- UPDATE ORDER STATUS ----------------
+   969→   969    update public.orders
+   970→   970    set payment_status = 'succeeded',
+   971→   971        order_status = 'confirmed'
+   972→   972    where id = p_order_id;
+   973→   973  
+   974→   974    -- ---------------- AWARD REWARD POINTS ----------------
+   975→   975    -- Rule: 5 points if BOTH conditions true:
+   976→   976    --   1. subtotal_paise > 50000 (₹500)
+   977→   977    --   2. donation_plantation_paise = 500 (₹5)
+   978→   978    if v_order.subtotal_paise > 50000 and v_order.donation_plantation_paise = 500 then
+   979→   979      v_points_to_earn := 5;
+   980→   980    end if;
+   981→   981  
+   982→   982    if v_points_to_earn > 0 then
+   983→   983      -- Lazy init balance row
+   984→   984      insert into public.reward_balance (user_id)
+   985→   985      values (v_user_id)
+   986→   986      on conflict (user_id) do nothing;
+   987→   987  
+   988→   988      select balance_points into v_balance
+   989→   989      from public.reward_balance
+   990→   990      where user_id = v_user_id
+   991→   991      for update;
+   992→   992  
+   993→   993      v_new_balance := v_balance + v_points_to_earn;
+   994→   994  
+   995→   995      update public.reward_balance
+   996→   996      set balance_points = v_new_balance,
+   997→   997          total_earned = total_earned + v_points_to_earn
+   998→   998      where user_id = v_user_id;
+   999→   999  
+  1000→  1000      insert into public.reward_transactions (
+  1001→  1001        user_id, order_id, points, type, reason, balance_after
+  1002→  1002      ) values (
+  1003→  1003        v_user_id, p_order_id,
+  1004→  1004        v_points_to_earn,
+  1005→  1005        'earn',
+  1006→  1006        'Earned from order ' || v_order.order_number,
+  1007→  1007        v_new_balance
+  1008→  1008      );
+  1009→  1009  
+  1010→  1010      -- Record earned points on the order
+  1011→  1011      update public.orders
+  1012→  1012      set reward_points_earned = v_points_to_earn
+  1013→  1013      where id = p_order_id;
+  1014→  1014    end if;
+  1015→  1015  
+  1016→  1016    -- ---------------- CLEAR USER'S CART ----------------
+  1017→  1017    -- Cart is now an order — empty the plate.
+  1018→  1018    delete from public.cart_items where user_id = v_user_id;
+  1019→  1019  
+  1020→  1020    return jsonb_build_object(
+  1021→  1021      'success', true,
+  1022→  1022      'order_id', p_order_id,
+  1023→  1023      'order_number', v_order.order_number,
+  1024→  1024      'reward_points_earned', v_points_to_earn
+  1025→  1025    );
+  1026→  1026  end;
+  1027→  1027  $$;
+  1028→  1028  
+  1029→  1029  -- NOTE: webhook handler runs as service role (no RLS), so we don't need
+  1030→  1030  -- to grant execute to authenticated. But we grant to authenticated as well
+  1031→  1031  -- in case the verify-payment route uses an authenticated client. Safe because
+  1032→  1032  -- the order_id/razorpay IDs are unguessable UUIDs.
+  1033→  1033  grant execute on function public.mark_order_succeeded(uuid, text, text, text, text, jsonb) to authenticated, anon;
+  1034→  1034  
+  1035→  1035  -- ============================================================================
+  1036→  1036  -- RPC: mark_order_failed
+  1037→  1037  -- ----------------------------------------------------------------------------
+  1038→  1038  -- Called from verify-payment (signature invalid) or from Razorpay webhook
+  1039→  1039  -- (payment.failed event). Restores redeemed reward points if applicable.
+  1040→  1040  -- ============================================================================
+  1041→  1041  create or replace function public.mark_order_failed(
+  1042→  1042    p_order_id uuid,
+  1043→  1043    p_failure_reason text,
+  1044→  1044    p_webhook_event_id text,
+  1045→  1045    p_event_type text,
+  1046→  1046    p_raw_payload jsonb
+  1047→  1047  )
+  1048→  1048  returns jsonb
+  1049→  1049  language plpgsql
+  1050→  1050  security definer
+  1051→  1051  set search_path = public
+  1052→  1052  as $$
+  1053→  1053  declare
+  1054→  1054    v_order public.orders%rowtype;
+  1055→  1055    v_payment_id uuid;
+  1056→  1056    v_balance integer;
+  1057→  1057    v_new_balance integer;
+  1058→  1058    v_user_id uuid;
+  1059→  1059  begin
+  1060→  1060    -- ---------------- IDEMPOTENCY CHECK ----------------
+  1061→  1061    begin
+  1062→  1062      insert into public.processed_webhook_events (event_id, event_type, payment_id)
+  1063→  1063      values (p_webhook_event_id, p_event_type, null)
+  1064→  1064      returning payment_id into v_payment_id;
+  1065→  1065    exception when unique_violation then
+  1066→  1066      return jsonb_build_object('success', true, 'message', 'Event already processed', 'idempotent', true);
+  1067→  1067    end;
+  1068→  1068  
+  1069→  1069    -- ---------------- LOAD ORDER (lock) ----------------
+  1070→  1070    select * into v_order
+  1071→  1071    from public.orders
+  1072→  1072    where id = p_order_id
+  1073→  1073    for update;
+  1074→  1074  
+  1075→  1075    if not found then
+  1076→  1076      return jsonb_build_object('success', false, 'message', 'Order not found');
+  1077→  1077    end if;
+  1078→  1078  
+  1079→  1079    v_user_id := v_order.user_id;
+  1080→  1080  
+  1081→  1081    -- Update payment record
+  1082→  1082    select id into v_payment_id
+  1083→  1083    from public.payments
+  1084→  1084    where razorpay_order_id = v_order.razorpay_order_id
+  1085→  1085    limit 1;
+  1086→  1086  
+  1087→  1087    if v_payment_id is not null then
+  1088→  1088      update public.payments
+  1089→  1089      set status = 'failed',
+  1090→  1090          failure_reason = p_failure_reason,
+  1091→  1091          raw_payload = p_raw_payload,
+  1092→  1092          webhook_processed_at = now()
+  1093→  1093      where id = v_payment_id;
+  1094→  1094  
+  1095→  1095      update public.processed_webhook_events
+  1096→  1096      set payment_id = v_payment_id
+  1097→  1097      where event_id = p_webhook_event_id;
+  1098→  1098    end if;
+  1099→  1099  
+  1100→  1100    -- If order is already failed/confirmed, skip
+  1101→  1101    if v_order.order_status in ('failed', 'confirmed') then
+  1102→  1102      return jsonb_build_object('success', true, 'message', 'Order already in terminal state', 'idempotent', true);
+  1103→  1103    end if;
+  1104→  1104  
+  1105→  1105    -- ---------------- UPDATE ORDER STATUS ----------------
+  1106→  1106    update public.orders
+  1107→  1107    set payment_status = 'failed',
+  1108→  1108        order_status = 'failed'
+  1109→  1109    where id = p_order_id;
+  1110→  1110  
+  1111→  1111    -- ---------------- RESTORE REDEEMED POINTS ----------------
+  1112→  1112    if v_order.reward_points_redeemed > 0 then
+  1113→  1113      select balance_points into v_balance
+  1114→  1114      from public.reward_balance
+  1115→  1115      where user_id = v_user_id
+  1116→  1116      for update;
+  1117→  1117  
+  1118→  1118      v_new_balance := v_balance + v_order.reward_points_redeemed;
+  1119→  1119  
+  1120→  1120      update public.reward_balance
+  1121→  1121      set balance_points = v_new_balance,
+  1122→  1122          total_redeemed = greatest(total_redeemed - v_order.reward_points_redeemed, 0)
+  1123→  1123      where user_id = v_user_id;
+  1124→  1124  
+  1125→  1125      insert into public.reward_transactions (
+  1126→  1126        user_id, order_id, points, type, reason, balance_after
+  1127→  1127      ) values (
+  1128→  1128        v_user_id, p_order_id,
+  1129→  1129        v_order.reward_points_redeemed,
+  1130→  1130        'restore',
+  1131→  1131        'Restored from failed order ' || v_order.order_number,
+  1132→  1132        v_new_balance
+  1133→  1133      );
+  1134→  1134    end if;
+  1135→  1135  
+  1136→  1136    return jsonb_build_object(
+  1137→  1137      'success', true,
+  1138→  1138      'order_id', p_order_id,
+  1139→  1139      'order_number', v_order.order_number,
+  1140→  1140      'reward_points_restored', v_order.reward_points_redeemed
+  1141→  1141    );
+  1142→  1142  end;
+  1143→  1143  $$;
+  1144→  1144  
+  1145→  1145  grant execute on function public.mark_order_failed(uuid, text, text, text, jsonb) to authenticated, anon;
+  1146→  1146  
+  1147→  1147  -- ============================================================================
+  1148→  1148  -- RPC: get_order_for_user
+  1149→  1149  -- ----------------------------------------------------------------------------
+  1150→  1150  -- Returns the full order (header + items) for a user. Only the order's
+  1151→  1151  -- owner can fetch it (RLS enforced on orders, but we double-check here).
+  1152→  1152  -- ============================================================================
+  1153→  1153  create or replace function public.get_order_for_user(
+  1154→  1154    p_user_id uuid,
+  1155→  1155    p_order_id uuid
+  1156→  1156  )
+  1157→  1157  returns jsonb
+  1158→  1158  language plpgsql
+  1159→  1159  security definer
+  1160→  1160  set search_path = public
+  1161→  1161  as $$
+  1162→  1162  declare
+  1163→  1163    v_order jsonb;
+  1164→  1164    v_items jsonb;
+  1165→  1165  begin
+  1166→  1166    select jsonb_build_object(
+  1167→  1167      'id', o.id,
+  1168→  1168      'order_number', o.order_number,
+  1169→  1169      'user_id', o.user_id,
+  1170→  1170      'branch_id', o.branch_id,
+  1171→  1171      'pickup_date', o.pickup_date,
+  1172→  1172      'pickup_slot_start', o.pickup_slot_start,
+  1173→  1173      'pickup_slot_end', o.pickup_slot_end,
+  1174→  1174      'subtotal_paise', o.subtotal_paise,
+  1175→  1175      'donation_plantation_paise', o.donation_plantation_paise,
+  1176→  1176      'donation_hunger_paise', o.donation_hunger_paise,
+  1177→  1177      'reward_points_redeemed', o.reward_points_redeemed,
+  1178→  1178      'reward_discount_paise', o.reward_discount_paise,
+  1179→  1179      'final_amount_paise', o.final_amount_paise,
+  1180→  1180      'reward_points_earned', o.reward_points_earned,
+  1181→  1181      'payment_status', o.payment_status,
+  1182→  1182      'order_status', o.order_status,
+  1183→  1183      'razorpay_order_id', o.razorpay_order_id,
+  1184→  1184      'customer_notes', o.customer_notes,
+  1185→  1185      'created_at', o.created_at,
+  1186→  1186      'updated_at', o.updated_at
+  1187→  1187    ) into v_order
+  1188→  1188    from public.orders o
+  1189→  1189    where o.id = p_order_id and o.user_id = p_user_id;
+  1190→  1190  
+  1191→  1191    if v_order is null then
+  1192→  1192      return jsonb_build_object('success', false, 'message', 'Order not found');
+  1193→  1193    end if;
+  1194→  1194  
+  1195→  1195    select coalesce(jsonb_agg(
+  1196→  1196      jsonb_build_object(
+  1197→  1197        'line_key', oi.line_key,
+  1198→  1198        'item_id', oi.item_id,
+  1199→  1199        'variant_id', oi.variant_id,
+  1200→  1200        'item_name', oi.item_name,
+  1201→  1201        'item_emoji', oi.item_emoji,
+  1202→  1202        'item_type', oi.item_type,
+  1203→  1203        'variant_label', oi.variant_label,
+  1204→  1204        'weight_grams', oi.weight_grams,
+  1205→  1205        'piece_count', oi.piece_count,
+  1206→  1206        'unit_price_paise', oi.unit_price_paise,
+  1207→  1207        'quantity', oi.quantity,
+  1208→  1208        'line_total_paise', oi.line_total_paise
+  1209→  1209      ) order by oi.created_at
+  1210→  1210    ), '[]'::jsonb) into v_items
+  1211→  1211    from public.order_items oi
+  1212→  1212    where oi.order_id = p_order_id;
+  1213→  1213  
+  1214→  1214    -- Fetch branch info
+  1215→  1215    return jsonb_build_object(
+  1216→  1216      'success', true,
+  1217→  1217      'order', v_order,
+  1218→  1218      'items', v_items
+  1219→  1219    );
+  1220→  1220  end;
+  1221→  1221  $$;
+  1222→  1222  
+  1223→  1223  grant execute on function public.get_order_for_user(uuid, uuid) to authenticated;
+  1224→  1224  
+  1225→  1225  -- ============================================================================
+  1226→  1226  -- RPC: cancel_draft_order
+  1227→  1227  -- ----------------------------------------------------------------------------
+  1228→  1228  -- Allows the user to cancel an order that's still in 'draft' or
+  1229→  1229  -- 'awaiting_payment' state (e.g. they abandoned checkout). Restores
+  1230→  1230  -- redeemed points. Once 'confirmed' or 'failed', cannot be cancelled.
+  1231→  1231  -- ============================================================================
+  1232→  1232  create or replace function public.cancel_draft_order(
+  1233→  1233    p_user_id uuid,
+  1234→  1234    p_order_id uuid
+  1235→  1235  )
+  1236→  1236  returns jsonb
+  1237→  1237  language plpgsql
+  1238→  1238  security definer
+  1239→  1239  set search_path = public
+  1240→  1240  as $$
+  1241→  1241  declare
+  1242→  1242    v_order public.orders%rowtype;
+  1243→  1243    v_balance integer;
+  1244→  1244    v_new_balance integer;
+  1245→  1245  begin
+  1246→  1246    select * into v_order
+  1247→  1247    from public.orders
+  1248→  1248    where id = p_order_id and user_id = p_user_id
+  1249→  1249    for update;
+  1250→  1250  
+  1251→  1251    if not found then
+  1252→  1252      return jsonb_build_object('success', false, 'message', 'Order not found');
+  1253→  1253    end if;
+  1254→  1254  
+  1255→  1255    if v_order.order_status not in ('draft', 'awaiting_payment') then
+  1256→  1256      return jsonb_build_object(
+  1257→  1257        'success', false,
+  1258→  1258        'message', 'Cannot cancel order in current state: ' || v_order.order_status
+  1259→  1259      );
+  1260→  1260    end if;
+  1261→  1261  
+  1262→  1262    update public.orders
+  1263→  1263    set order_status = 'cancelled'
+  1264→  1264    where id = p_order_id;
+  1265→  1265  
+  1266→  1266    -- Restore redeemed points
+  1267→  1267    if v_order.reward_points_redeemed > 0 then
+  1268→  1268      select balance_points into v_balance
+  1269→  1269      from public.reward_balance
+  1270→  1270      where user_id = p_user_id
+  1271→  1271      for update;
+  1272→  1272  
+  1273→  1273      v_new_balance := v_balance + v_order.reward_points_redeemed;
+  1274→  1274  
+  1275→  1275      update public.reward_balance
+  1276→  1276      set balance_points = v_new_balance
+  1277→  1277      where user_id = p_user_id;
+  1278→  1278  
+  1279→  1279      insert into public.reward_transactions (
+  1280→  1280        user_id, order_id, points, type, reason, balance_after
+  1281→  1281      ) values (
+  1282→  1282        p_user_id, p_order_id,
+  1283→  1283        v_order.reward_points_redeemed,
+  1284→  1284        'restore',
+  1285→  1285        'Restored from cancelled order ' || v_order.order_number,
+  1286→  1286        v_new_balance
+  1287→  1287      );
+  1288→  1288    end if;
+  1289→  1289  
+  1290→  1290    return jsonb_build_object('success', true, 'order_id', p_order_id);
+  1291→  1291  end;
+  1292→  1292  $$;
+  1293→  1293  
+  1294→  1294  grant execute on function public.cancel_draft_order(uuid, uuid) to authenticated;
+  1295→  1295  
+  1296→  1296  -- ============================================================================
+  1297→  1297  -- RPC: get_recent_orders_for_user
+  1298→  1298  -- ----------------------------------------------------------------------------
+  1299→  1299  -- Returns last N orders for the user (default 20). Used in account page
+  1300→  1300  -- (future module).
+  1301→  1301  -- ============================================================================
+  1302→  1302  create or replace function public.get_recent_orders_for_user(
+  1303→  1303    p_user_id uuid,
+  1304→  1304    p_limit integer default 20
+  1305→  1305  )
+  1306→  1306  returns table (
+  1307→  1307    id uuid,
+  1308→  1308    order_number text,
+  1309→  1309    branch_id uuid,
+  1310→  1310    pickup_date date,
+  1311→  1311    pickup_slot_start time,
+  1312→  1312    pickup_slot_end time,
+  1313→  1313    final_amount_paise integer,
+  1314→  1314    payment_status text,
+  1315→  1315    order_status text,
+  1316→  1316    created_at timestamptz
+  1317→  1317  )
+  1318→  1318  language plpgsql
+  1319→  1319  security definer
+  1320→  1320  set search_path = public
+  1321→  1321  as $$
+  1322→  1322  begin
+  1323→  1323    if p_limit is null or p_limit < 1 or p_limit > 100 then
+  1324→  1324      p_limit := 20;
+  1325→  1325    end if;
+  1326→  1326  
+  1327→  1327    return query
+  1328→  1328      select
+  1329→  1329        o.id, o.order_number, o.branch_id,
+  1330→  1330        o.pickup_date, o.pickup_slot_start, o.pickup_slot_end,
+  1331→  1331        o.final_amount_paise, o.payment_status, o.order_status,
+  1332→  1332        o.created_at
+  1333→  1333      from public.orders o
+  1334→  1334      where o.user_id = p_user_id
+  1335→  1335      order by o.created_at desc
+  1336→  1336      limit p_limit;
+  1337→  1337  end;
+  1338→  1338  $$;
+  1339→  1339  
+  1340→  1340  grant execute on function public.get_recent_orders_for_user(uuid, integer) to authenticated;

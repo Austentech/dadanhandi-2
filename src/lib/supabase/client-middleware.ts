@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protected routes that require authentication
+  // Protected routes that require customer authentication
   const protectedPaths = ['/account']
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
@@ -44,6 +44,30 @@ export async function updateSession(request: NextRequest) {
     url.pathname = '/'
     url.searchParams.set('auth', 'required')
     return NextResponse.redirect(url)
+  }
+
+  // ========================
+  // Admin Panel Route Protection
+  // ========================
+  const pathname = request.nextUrl.pathname
+
+  if (pathname.startsWith('/admin')) {
+    // Admin login page is always accessible
+    if (pathname === '/admin/login') {
+      return supabaseResponse
+    }
+
+    // All other /admin/* routes require admin session cookie
+    const adminSessionCookie = request.cookies.get('admin_session')
+    if (!adminSessionCookie || !adminSessionCookie.value) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin/login'
+      return NextResponse.redirect(url)
+    }
+
+    // Session exists — let the page/API validate it server-side
+    // Middleware only checks cookie existence, not validity
+    // Actual validation happens in /api/admin/auth/session
   }
 
   return supabaseResponse

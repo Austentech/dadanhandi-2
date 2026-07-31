@@ -1,21 +1,29 @@
 /**
  * Email Service
- * Uses Resend (https://resend.com) to send transactional emails.
- * Falls back to console.log in development if RESEND_API_KEY is not set.
+ * Uses Nodemailer with Gmail SMTP to send transactional emails.
+ * In development without SMTP env vars, logs to console.
  */
 
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
-let resendClient: Resend | null = null
+let transporter: nodemailer.Transporter | null = null
 
-function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
+function getTransporter(): nodemailer.Transporter | null {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     return null
   }
-  if (!resendClient) {
-    resendClient = new Resend(process.env.RESEND_API_KEY)
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false, // STARTTLS
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
   }
-  return resendClient
+  return transporter
 }
 
 export interface SendEmailParams {
@@ -26,39 +34,35 @@ export interface SendEmailParams {
 }
 
 /**
- * Send a plain-text email via Resend.
- * In development without RESEND_API_KEY, logs to console.
+ * Send a plain-text email via SMTP.
+ * Falls back to console.log if SMTP is not configured.
  */
 export async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; error?: string }> {
-  const client = getResendClient()
-  const from = params.from || 'Dadan Handi <noreply@dadanhandi.com>'
+  const client = getTransporter()
+  const from = params.from || process.env.SMTP_FROM || `Dadan Handi <${process.env.SMTP_USER || 'noreply@dadanhandi.com'}>`
 
-  // Development fallback: log to console
+  // No SMTP configured — log to console
   if (!client) {
     console.log(`\n[EMAIL DEV] To: ${params.to}`)
     console.log(`[EMAIL DEV] From: ${from}`)
     console.log(`[EMAIL DEV] Subject: ${params.subject}`)
     console.log(`[EMAIL DEV] Body: ${params.text}`)
-    console.log('[EMAIL DEV] (Set RESEND_API_KEY to send real emails)\n')
+    console.log('[EMAIL DEV] (Set SMTP_USER + SMTP_PASS env vars to send real emails)\n')
     return { success: true }
   }
 
   try {
-    const { error } = await client.emails.send({
+    const info = await client.sendMail({
       from,
       to: [params.to],
       subject: params.subject,
       text: params.text,
     })
 
-    if (error) {
-      console.error('[EMAIL] Resend error:', error)
-      return { success: false, error: error.message }
-    }
-
+    console.log('[EMAIL] Sent:', info.messageId)
     return { success: true }
   } catch (err) {
-    console.error('[EMAIL] Send error:', err)
+    console.error('[EMAIL] SMTP error:', err)
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }

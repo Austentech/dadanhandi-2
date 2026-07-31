@@ -63,6 +63,7 @@
     "next-auth": "^4.24.11",
     "next-intl": "^4.3.4",
     "next-themes": "^0.4.6",
+    "nodemailer": "^7.0.13",
     "prisma": "^6.11.1",
     "razorpay": "^2.9.8",
     "react": "^19.0.0",
@@ -73,7 +74,6 @@
     "react-resizable-panels": "^3.0.3",
     "react-syntax-highlighter": "^15.6.1",
     "recharts": "^2.15.4",
-    "resend": "^6.18.1",
     "sharp": "^0.34.3",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
@@ -86,6 +86,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "bun-types": "^1.3.4",

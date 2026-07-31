@@ -1,21 +1,43 @@
 /**
  * POST /api/admin/auth/send-otp
  * Send a 6-character alphanumeric OTP to the admin's email.
- * Rate limited. Generic messages to prevent account enumeration.
+ * Only registered admin emails are accepted.
+ * Rate limited. Input sanitized.
  */
 
 import { NextResponse } from 'next/server'
 import { handleSendOtp } from '@/services/admin/admin-auth-service'
 import { getClientIp } from '@/lib/security/utils'
 
+// Max email length to prevent abuse
+const MAX_EMAIL_LENGTH = 254
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const email = body?.email
+    const rawEmail = body?.email
 
-    if (!email || typeof email !== 'string') {
+    // Validate input type
+    if (!rawEmail || typeof rawEmail !== 'string') {
       return NextResponse.json(
         { success: false, message: 'Email is required.' },
+        { status: 400 }
+      )
+    }
+
+    // Basic server-side sanitization before passing to service
+    const email = rawEmail.trim()
+    if (email.length === 0 || email.length > MAX_EMAIL_LENGTH) {
+      return NextResponse.json(
+        { success: false, message: 'Please enter a valid email address.' },
+        { status: 400 }
+      )
+    }
+
+    // Reject dangerous characters
+    if (/[;\'\"\\<>]/.test(email)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid input.' },
         { status: 400 }
       )
     }
@@ -23,7 +45,7 @@ export async function POST(request: Request) {
     const ip = await getClientIp()
     const result = await handleSendOtp(email, ip)
 
-    return NextResponse.json(result, { status: result.success ? 200 : 429 })
+    return NextResponse.json(result, { status: result.success ? 200 : 403 })
   } catch (err) {
     console.error('[ADMIN API] send-otp error:', err)
     return NextResponse.json(

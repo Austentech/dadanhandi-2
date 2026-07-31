@@ -4,12 +4,14 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminStore } from '@/store/admin-store'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
+import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 // ---------------------------------------------------------------------------
-// Email validation helper
+// Strict email validation — must match real email format
 // ---------------------------------------------------------------------------
 function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const cleaned = email.trim().toLowerCase()
+  return /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/.test(cleaned) && cleaned.length <= 254
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +41,9 @@ export default function AdminLoginPage() {
   // Track resend cooldown
   const [resendCooldown, setResendCooldown] = useState(0)
 
+  // Local email error for client-side validation
+  const [emailClientError, setEmailClientError] = useState<string | null>(null)
+
   // Check session on mount — redirect if already authed
   useEffect(() => {
     checkSession()
@@ -66,15 +71,56 @@ export default function AdminLoginPage() {
 
   // ---- Step 1: Send OTP ----
   const handleSendOtp = useCallback(async () => {
-    if (!isValidEmail(otpEmail)) {
-      useAdminStore.setState({ otpError: 'Please enter a valid email address.' })
+    const trimmed = otpEmail.trim()
+
+    if (!trimmed) {
+      setEmailClientError('Please enter your email address.')
       return
     }
-    const success = await sendOtp()
+
+    // Reject dangerous characters immediately
+    if (/[;\'"\\<>]/.test(trimmed)) {
+      setEmailClientError('Invalid characters in email.')
+      return
+    }
+
+    if (!isValidEmail(trimmed)) {
+      setEmailClientError('Please enter a valid email address.')
+      return
+    }
+
+    setEmailClientError(null)
+    setOtpEmail(trimmed.toLowerCase())
+
+    // Small delay to let store update
+    const emailToSend = trimmed.toLowerCase()
+    const success = await sendOtpWithEmail(emailToSend)
     if (success) {
       setResendCooldown(30)
     }
-  }, [otpEmail, sendOtp])
+  }, [otpEmail, setOtpEmail])
+
+  // Helper to send OTP with the sanitized email
+  const sendOtpWithEmail = useCallback(async (email: string) => {
+    useAdminStore.setState({ isSendingOtp: true, otpError: null, otpMessage: null })
+    try {
+      const res = await fetch('/api/admin/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const result = await res.json()
+      if (result.success) {
+        useAdminStore.setState({ isSendingOtp: false, otpSent: true, otpMessage: result.message, otpEmail: email })
+        return true
+      }
+      useAdminStore.setState({ isSendingOtp: false, otpError: result.message })
+      return false
+    } catch {
+      useAdminStore.setState({ isSendingOtp: false, otpError: 'Network error. Please try again.' })
+      return false
+    }
+  }, [])
 
   // ---- Step 2: Verify OTP ----
   const handleVerify = useCallback(async () => {
@@ -84,17 +130,19 @@ export default function AdminLoginPage() {
     }
   }, [verifyOtp, router])
 
-  // ---- OTP Input Handlers ----
+  // ---- OTP Input Handlers (ALPHANUMERIC — A-Z and 2-9) ----
+  const VALID_OTP_CHARS = new Set(ADMIN_CONFIG.OTP_ALPHABET.split(''))
+
   const handleOtpChange = useCallback(
     (index: number, value: string) => {
-      // Only allow digits
-      const digit = value.replace(/\D/g, '').slice(-1)
+      const raw = value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(-1)
+      const char = raw && VALID_OTP_CHARS.has(raw) ? raw : ''
       const newDigits = [...otpDigits]
-      newDigits[index] = digit
+      newDigits[index] = char
       setOtpDigits(newDigits)
 
       // Auto-advance to next input
-      if (digit && index < 5) {
+      if (char && index < ADMIN_CONFIG.OTP_LENGTH - 1) {
         const nextInput = document.getElementById(`admin-otp-${index + 1}`)
         nextInput?.focus()
       }
@@ -105,7 +153,6 @@ export default function AdminLoginPage() {
   const handleOtpKeyDown = useCallback(
     (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-        // Move focus back
         const prevInput = document.getElementById(`admin-otp-${index - 1}`)
         prevInput?.focus()
       }
@@ -116,15 +163,18 @@ export default function AdminLoginPage() {
   const handleOtpPaste = useCallback(
     (e: React.ClipboardEvent) => {
       e.preventDefault()
-      const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+      const pasted = e.clipboardData
+        .getData('text')
+        .toUpperCase()
+        .replace(/[^A-Z2-9]/g, '')
+        .slice(0, ADMIN_CONFIG.OTP_LENGTH)
       if (pasted.length === 0) return
       const newDigits = [...otpDigits]
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = pasted[i] || ''
+      for (let i = 0; i < ADMIN_CONFIG.OTP_LENGTH; i++) {
+        newDigits[i] = VALID_OTP_CHARS.has(pasted[i]) ? pasted[i] : ''
       }
       setOtpDigits(newDigits)
-      // Focus last filled or next empty
-      const focusIdx = Math.min(pasted.length, 5)
+      const focusIdx = Math.min(pasted.length, ADMIN_CONFIG.OTP_LENGTH - 1)
       const el = document.getElementById(`admin-otp-${focusIdx}`)
       el?.focus()
     },
@@ -133,11 +183,11 @@ export default function AdminLoginPage() {
 
   const handleResend = useCallback(async () => {
     if (resendCooldown > 0) return
-    const success = await sendOtp()
+    const success = await sendOtpWithEmail(useAdminStore.getState().otpEmail)
     if (success) {
       setResendCooldown(30)
     }
-  }, [resendCooldown, sendOtp])
+  }, [resendCooldown, sendOtpWithEmail])
 
   const handleBackToEmail = useCallback(() => {
     useAdminStore.setState({
@@ -146,6 +196,7 @@ export default function AdminLoginPage() {
       otpMessage: null,
       otpDigits: ['', '', '', '', '', ''],
     })
+    setEmailClientError(null)
   }, [])
 
   const handleEmailKeyDown = useCallback(
@@ -185,6 +236,8 @@ export default function AdminLoginPage() {
     )
   }
 
+  const displayError = emailClientError || otpError
+
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
@@ -202,12 +255,13 @@ export default function AdminLoginPage() {
               <ArrowLeft size={16} /> Back
             </button>
 
-            <div className="admin-login-heading">Verify OTP</div>
+            <div className="admin-login-heading">Verify Code</div>
             <div className="admin-login-desc">
-              Enter the 6-digit code sent to <strong>{otpEmail}</strong>
+              Enter the {ADMIN_CONFIG.OTP_LENGTH}-character code sent to{' '}
+              <strong>{otpEmail}</strong>
             </div>
 
-            {/* OTP Inputs */}
+            {/* OTP Inputs — ALPHANUMERIC */}
             <div className="admin-otp-container" onPaste={handleOtpPaste}>
               {otpDigits.map((digit, idx) => (
                 <input
@@ -215,7 +269,9 @@ export default function AdminLoginPage() {
                   id={`admin-otp-${idx}`}
                   ref={idx === 0 ? inputRef0 : undefined}
                   type="text"
-                  inputMode="numeric"
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  autoComplete="one-time-code"
                   maxLength={1}
                   value={digit}
                   className={`admin-otp-input ${otpError ? 'error' : ''}`}
@@ -224,8 +280,7 @@ export default function AdminLoginPage() {
                     handleOtpKeyDown(idx, e)
                     handleOtpInputKeyDown(e)
                   }}
-                  aria-label={`Digit ${idx + 1}`}
-                  autoComplete="one-time-code"
+                  aria-label={`Character ${idx + 1}`}
                 />
               ))}
             </div>
@@ -237,7 +292,7 @@ export default function AdminLoginPage() {
             <button
               className="admin-login-btn"
               onClick={handleVerify}
-              disabled={isVerifyingOtp || otpDigits.join('').length < 6}
+              disabled={isVerifyingOtp || otpDigits.join('').length < ADMIN_CONFIG.OTP_LENGTH}
             >
               {isVerifyingOtp && <span className="admin-login-spinner" />}
               {isVerifyingOtp ? 'Verifying...' : 'Verify Code'}
@@ -259,7 +314,7 @@ export default function AdminLoginPage() {
           <>
             <div className="admin-login-heading">Welcome back</div>
             <div className="admin-login-desc">
-              Enter your admin email to receive a one-time login code.
+              Enter your admin email to receive a login code.
             </div>
 
             <div style={{ marginBottom: 16 }}>
@@ -269,19 +324,24 @@ export default function AdminLoginPage() {
               <input
                 id="admin-email"
                 type="email"
-                className={`admin-login-input ${otpError ? 'error' : ''}`}
+                className={`admin-login-input ${displayError ? 'error' : ''}`}
                 placeholder="admin@dadanhandi.com"
                 value={otpEmail}
-                onChange={(e) => setOtpEmail(e.target.value)}
-                onKeyDown={handleEmailKeyDown}
+                onChange={(e) => {
+                  setEmailClientError(null)
+                  setOtpEmail(e.target.value)
+                }}
+                onKeyDown={(e) => {
+                  handleEmailKeyDown(e)
+                }}
                 autoFocus
                 autoComplete="email"
               />
             </div>
 
-            {otpError && <div className="admin-login-error">{otpError}</div>}
-            {!otpError && otpMessage && <div className="admin-login-message">{otpMessage}</div>}
-            {!otpError && !otpMessage && <div style={{ minHeight: 20 }} />}
+            {displayError && <div className="admin-login-error">{displayError}</div>}
+            {!displayError && otpMessage && <div className="admin-login-message">{otpMessage}</div>}
+            {!displayError && !otpMessage && <div style={{ minHeight: 20 }} />}
 
             <button
               className="admin-login-btn"

@@ -1,6 +1,7 @@
 /**
  * POST /api/admin/auth/verify-otp
  * Verify OTP and create admin session.
+ * Input sanitized server-side.
  */
 
 import { NextResponse } from 'next/server'
@@ -11,28 +12,43 @@ import { ADMIN_CONFIG } from '@/lib/admin/config'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const email = body?.email
-    const otp = body?.otp
+    const rawEmail = body?.email
+    const rawOtp = body?.otp
 
-    if (!email || typeof email !== 'string') {
+    // Validate email input
+    if (!rawEmail || typeof rawEmail !== 'string') {
       return NextResponse.json(
         { success: false, message: 'Email is required.' },
         { status: 400 }
       )
     }
-    if (!otp || typeof otp !== 'string') {
+    if (rawEmail.trim().length > 254) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid email.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate OTP input
+    if (!rawOtp || typeof rawOtp !== 'string') {
       return NextResponse.json(
         { success: false, message: 'Verification code is required.' },
+        { status: 400 }
+      )
+    }
+    const cleanOtp = rawOtp.toUpperCase().trim()
+    if (cleanOtp.length !== ADMIN_CONFIG.OTP_LENGTH || !/^[A-Z2-9]+$/.test(cleanOtp)) {
+      return NextResponse.json(
+        { success: false, message: `Please enter a valid ${ADMIN_CONFIG.OTP_LENGTH}-character code.` },
         { status: 400 }
       )
     }
 
     const ip = await getClientIp()
     const userAgent = request.headers.get('user-agent')
-    const result = await handleVerifyOtp(email, otp, ip, userAgent)
+    const result = await handleVerifyOtp(rawEmail.trim(), cleanOtp, ip, userAgent)
 
     if (result.success && result.token) {
-      // Create response and set session cookie
       const response = NextResponse.json({
         success: true,
         message: 'Login successful.',

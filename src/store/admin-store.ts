@@ -6,6 +6,7 @@
 'use client'
 
 import { create } from 'zustand'
+import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 export type AdminTab = 'dashboard' | 'account' | 'menu' | 'orders-new' | 'orders-ongoing' | 'orders-past' | 'orders-cancelled'
 
@@ -36,8 +37,6 @@ interface AdminStoreState {
 
   // Actions
   setOtpEmail: (email: string) => void
-  sendOtp: () => Promise<boolean>
-  setOtpDigits: (digits: string[]) => void
   verifyOtp: () => Promise<boolean>
   logout: () => Promise<void>
   checkSession: () => Promise<void>
@@ -57,7 +56,7 @@ const initialState = {
   otpError: null as string | null,
   otpMessage: null as string | null,
   isVerifyingOtp: false,
-  otpDigits: ['', '', '', '', '', ''],
+  otpDigits: Array(ADMIN_CONFIG.OTP_LENGTH).fill(''),
 
   sidebarOpen: false,
   sidebarCollapsed: false,
@@ -68,41 +67,20 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   setOtpEmail: (email) => set({ otpEmail: email, otpError: null, otpMessage: null }),
 
-  sendOtp: async () => {
-    const { otpEmail } = get()
-    if (!otpEmail) {
-      set({ otpError: 'Please enter your email address.' })
-      return false
-    }
-    set({ isSendingOtp: true, otpError: null, otpMessage: null })
-    try {
-      const res = await fetch('/api/admin/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: otpEmail }),
-      })
-      const result = await res.json()
-      if (result.success) {
-        set({ isSendingOtp: false, otpSent: true, otpMessage: result.message })
-        return true
-      }
-      set({ isSendingOtp: false, otpError: result.message })
-      return false
-    } catch {
-      set({ isSendingOtp: false, otpError: 'Network error. Please try again.' })
-      return false
-    }
-  },
-
-  setOtpDigits: (digits) => set({ otpDigits: digits, otpError: null }),
-
   verifyOtp: async () => {
     const { otpEmail, otpDigits } = get()
-    const otp = otpDigits.join('')
-    if (otp.length !== 6) {
-      set({ otpError: 'Please enter all 6 digits.' })
+    const otp = otpDigits.join('').toUpperCase()
+
+    // Validate OTP: correct length and valid characters
+    if (otp.length !== ADMIN_CONFIG.OTP_LENGTH) {
+      set({ otpError: `Please enter all ${ADMIN_CONFIG.OTP_LENGTH} characters.` })
       return false
     }
+    if (!/^[A-Z2-9]+$/.test(otp)) {
+      set({ otpError: 'Code contains invalid characters.' })
+      return false
+    }
+
     set({ isVerifyingOtp: true, otpError: null })
     try {
       const res = await fetch('/api/admin/auth/verify-otp', {

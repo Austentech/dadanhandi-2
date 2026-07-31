@@ -2,7 +2,9 @@
  * Admin Auth Service
  * Orchestrates the complete admin authentication flow:
  * 1. Send OTP → 2. Verify OTP → 3. Create Session → 4. Logout
- * Also handles login logging and account enumeration prevention.
+ *
+ * Security: Only registered admin emails are accepted.
+ * Input is sanitized server-side. Email shows only the OTP code.
  */
 
 import { createServerClient } from '@/lib/supabase/client-server'
@@ -10,39 +12,27 @@ import { checkRateLimit } from '@/lib/security/rate-limiter'
 import { ADMIN_CONFIG } from '@/lib/admin/config'
 import { generateOtp, storeOtp, verifyOtp } from './admin-otp-service'
 import { createSession, invalidateSession } from './admin-session-service'
-import type { AdminUser, AdminLoginLog, LoginLogStatus } from '@/types/admin'
+import { sendEmail } from '@/lib/email'
+import type { AdminUser, LoginLogStatus } from '@/types/admin'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function sanitizeEmail(email: string): string {
-  return (email || '').toLowerCase().trim()
-}
-
 /**
- * Send OTP email. In production, integrate Resend/SMTP.
- * For now, logs to console in development.
+ * Sanitize email: trim, lowercase, strip dangerous characters.
+ * Returns null if input is suspicious (SQL injection patterns, etc.).
  */
-async function sendOtpEmail(email: string, otp: string): Promise<void> {
-  const subject = ADMIN_CONFIG.EMAIL_SUBJECT
-  const body = `Your admin login verification code is: ${otp}\n\nThis code expires in ${ADMIN_CONFIG.OTP_EXPIRY_SECONDS / 60} minutes.\n\nIf you did not request this code, please ignore this email.`
-
-  if (process.env.NODE_ENV === 'production') {
-    // TODO: Integrate Resend or SMTP for production email delivery
-    // This is a placeholder that logs the email content.
-    // Replace with actual email service integration.
-    console.log(`[ADMIN AUTH] Email to: ${email}`)
-    console.log(`[ADMIN AUTH] Subject: ${subject}`)
-    console.log(`[ADMIN AUTH] OTP: ${otp}`)
-    console.log('[ADMIN AUTH] WARNING: Production email not configured. OTP logged to console.')
-  } else {
-    console.log(`\n[ADMIN DEV] ===== OTP EMAIL =====`)
-    console.log(`[ADMIN DEV] To: ${email}`)
-    console.log(`[ADMIN DEV] OTP: ${otp}`)
-    console.log(`[ADMIN DEV] Expires in: ${ADMIN_CONFIG.OTP_EXPIRY_SECONDS / 60} minutes`)
-    console.log(`[ADMIN DEV] ========================\n`)
-  }
+function sanitizeEmail(email: unknown): string | null {
+  if (typeof email !== 'string' || !email.trim()) return null
+  const cleaned = email.trim().toLowerCase()
+  // Block obviously malicious inputs
+  if (/[;\'"\\<>]/.test(cleaned)) return null
+  // Must match standard email format
+  if (!/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/.test(cleaned)) return null
+  // Max length sanity check
+  if (cleaned.length > 254) return null
+  return cleaned
 }
 
 /**
@@ -67,16 +57,15 @@ async function createLoginLog(params: {
       failure_reason: params.failureReason || null,
     })
   } catch (err) {
-    // Never expose log errors to the client
     console.error('[ADMIN AUTH] Failed to create login log:', err)
   }
 }
 
 /**
- * Find an admin user by email.
- * Returns null if not found or inactive — callers should NOT distinguish.
+ * Find an active admin user by email.
+ * Returns null if not found or inactive.
  */
-async function findAdminUser(email: string): Promise<{ user: AdminUser } | null> {
+async function findAdminUser(email: string): Promise<AdminUser | null> {
   const supabase = await createServerClient()
   const { data } = await supabase
     .from('admin_users')
@@ -85,7 +74,7 @@ async function findAdminUser(email: string): Promise<{ user: AdminUser } | null>
     .eq('is_active', true)
     .single()
   if (!data) return null
-  return { user: data as unknown as AdminUser }
+  return data as unknown as AdminUser
 }
 
 // ============================================================================
@@ -93,13 +82,12 @@ async function findAdminUser(email: string): Promise<{ user: AdminUser } | null>
 // ============================================================================
 
 export async function handleSendOtp(
-  email: string,
+  email: unknown,
   ip: string
 ): Promise<{ success: boolean; message: string }> {
+  // Sanitize — reject bad input immediately
   const sanitizedEmail = sanitizeEmail(email)
-
-  // Basic email format validation
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
+  if (!sanitizedEmail) {
     return { success: false, message: 'Please enter a valid email address.' }
   }
 
@@ -121,28 +109,51 @@ export async function handleSendOtp(
     }
   }
 
-  // Check if admin exists (but never reveal this to the caller)
-  const adminResult = await findAdminUser(sanitizedEmail)
-
-  if (adminResult) {
-    // Generate and store OTP
-    const otp = generateOtp()
-    try {
-      await storeOtp(sanitizedEmail, otp)
-      await sendOtpEmail(sanitizedEmail, otp)
-    } catch (err) {
-      console.error('[ADMIN AUTH] Failed to send OTP:', err)
-      return {
-        success: false,
-        message: 'Something went wrong. Please try again.',
-      }
+  // Check if this is a registered admin email — reject if not
+  const adminUser = await findAdminUser(sanitizedEmail)
+  if (!adminUser) {
+    await createLoginLog({
+      email: sanitizedEmail,
+      status: 'failure',
+      ipAddress: ip,
+      failureReason: 'Unregistered admin email',
+    })
+    return {
+      success: false,
+      message: 'This email is not authorized for admin access.',
     }
   }
 
-  // Always return the same generic message
+  // Generate and store OTP
+  const otp = generateOtp()
+  try {
+    await storeOtp(sanitizedEmail, otp)
+
+    // Send real email with ONLY the OTP code
+    const emailResult = await sendEmail({
+      to: sanitizedEmail,
+      subject: 'Admin Login Code',
+      text: otp,
+    })
+
+    if (!emailResult.success) {
+      console.error('[ADMIN AUTH] Email send failed:', emailResult.error)
+      return {
+        success: false,
+        message: 'Failed to send verification code. Please try again.',
+      }
+    }
+  } catch (err) {
+    console.error('[ADMIN AUTH] Failed to send OTP:', err)
+    return {
+      success: false,
+      message: 'Something went wrong. Please try again.',
+    }
+  }
+
   return {
     success: true,
-    message: 'If this email is registered, a verification code has been sent.',
+    message: 'Verification code sent to your email.',
   }
 }
 
@@ -151,8 +162,8 @@ export async function handleSendOtp(
 // ============================================================================
 
 export async function handleVerifyOtp(
-  email: string,
-  otp: string,
+  email: unknown,
+  otp: unknown,
   ip: string,
   userAgent: string | null
 ): Promise<{
@@ -161,10 +172,18 @@ export async function handleVerifyOtp(
   token?: string
   sessionId?: string
 }> {
+  // Sanitize email
   const sanitizedEmail = sanitizeEmail(email)
+  if (!sanitizedEmail) {
+    return { success: false, message: 'Invalid request.' }
+  }
 
-  // Validate OTP format
-  if (!otp || otp.length !== ADMIN_CONFIG.OTP_LENGTH || !/^[A-Z2-9]+$/.test(otp.toUpperCase())) {
+  // Sanitize OTP — must be string of correct length and valid characters
+  if (typeof otp !== 'string') {
+    return { success: false, message: 'Please enter a valid code.' }
+  }
+  const cleanOtp = otp.toUpperCase().trim()
+  if (cleanOtp.length !== ADMIN_CONFIG.OTP_LENGTH || !/^[A-Z2-9]+$/.test(cleanOtp)) {
     return { success: false, message: 'Please enter a valid 6-character code.' }
   }
 
@@ -178,13 +197,12 @@ export async function handleVerifyOtp(
   // Find admin user
   const adminResult = await findAdminUser(sanitizedEmail)
   if (!adminResult) {
-    // Don't reveal whether email exists
     await createLoginLog({ email: sanitizedEmail, status: 'failure', ipAddress: ip, userAgent, failureReason: 'Unknown email' })
     return { success: false, message: 'Invalid code. Please try again.' }
   }
 
   // Verify OTP
-  const result = await verifyOtp(sanitizedEmail, otp.toUpperCase())
+  const result = await verifyOtp(sanitizedEmail, cleanOtp)
   if (!result.valid) {
     const reason = result.reason || 'invalid'
     const statusMap: Record<string, LoginLogStatus> = {
@@ -193,7 +211,7 @@ export async function handleVerifyOtp(
       max_attempts: 'rate_limited',
     }
     await createLoginLog({
-      userId: adminResult.user.id,
+      userId: adminResult.id,
       email: sanitizedEmail,
       status: statusMap[reason] || 'failure',
       ipAddress: ip,
@@ -209,7 +227,7 @@ export async function handleVerifyOtp(
   }
 
   // Create session
-  const sessionResult = await createSession(adminResult.user.id)
+  const sessionResult = await createSession(adminResult.id)
   if (!sessionResult.token) {
     console.error('[ADMIN AUTH] Failed to create session after successful OTP verification')
     return { success: false, message: 'Something went wrong. Please try again.' }
@@ -220,11 +238,11 @@ export async function handleVerifyOtp(
   await supabase
     .from('admin_users')
     .update({ last_login_at: new Date().toISOString() })
-    .eq('id', adminResult.user.id)
+    .eq('id', adminResult.id)
 
   // Log success
   await createLoginLog({
-    userId: adminResult.user.id,
+    userId: adminResult.id,
     email: sanitizedEmail,
     status: 'success',
     ipAddress: ip,
@@ -245,7 +263,6 @@ export async function handleVerifyOtp(
 
 export async function handleLogout(token: string, sessionId?: string): Promise<void> {
   await invalidateSession(token)
-  // Session duration is calculated by DB trigger or on read
 }
 
 // ============================================================================

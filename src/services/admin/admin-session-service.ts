@@ -5,7 +5,7 @@
  */
 
 import crypto from 'crypto'
-import { createServerClient } from '@/lib/supabase/client-server'
+import { createAdminClient } from '@/lib/supabase/client-admin'
 import { ADMIN_CONFIG } from '@/lib/admin/config'
 import type { AdminUser, AdminSession } from '@/types/admin'
 import { headers } from 'next/headers'
@@ -58,7 +58,7 @@ export async function createSession(
   userId: string,
   request?: Request
 ): Promise<CreateSessionResult> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const tokenBytes = crypto.randomBytes(ADMIN_CONFIG.TOKEN_LENGTH)
   const token = tokenBytes.toString('hex')
   const tokenHash = hashToken(token)
@@ -113,7 +113,7 @@ export interface ValidateSessionResult {
  * Updates last_active_at on successful validation.
  */
 export async function validateSession(token: string): Promise<ValidateSessionResult> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const tokenHash = hashToken(token)
   const now = new Date().toISOString()
 
@@ -165,7 +165,7 @@ export async function validateSession(token: string): Promise<ValidateSessionRes
  * Invalidate a single session.
  */
 export async function invalidateSession(token: string): Promise<void> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const tokenHash = hashToken(token)
   await supabase.from('admin_sessions').update({ is_valid: false }).eq('token_hash', tokenHash)
 }
@@ -174,7 +174,7 @@ export async function invalidateSession(token: string): Promise<void> {
  * Invalidate all sessions for a user.
  */
 export async function invalidateAllSessions(userId: string): Promise<void> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   await supabase.from('admin_sessions').update({ is_valid: false }).eq('user_id', userId)
 }
 
@@ -186,7 +186,7 @@ export async function invalidateAllSessions(userId: string): Promise<void> {
  * Get all valid, non-expired sessions for a user.
  */
 export async function getActiveSessions(userId: string): Promise<AdminSession[]> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const now = new Date().toISOString()
   const { data } = await supabase
     .from('admin_sessions')

@@ -7,7 +7,7 @@
  * Input is sanitized server-side. Email shows only the OTP code.
  */
 
-import { createServerClient } from '@/lib/supabase/client-server'
+import { createAdminClient } from '@/lib/supabase/client-admin'
 import { checkRateLimit } from '@/lib/security/rate-limiter'
 import { ADMIN_CONFIG } from '@/lib/admin/config'
 import { generateOtp, storeOtp, verifyOtp } from './admin-otp-service'
@@ -47,7 +47,7 @@ async function createLoginLog(params: {
   failureReason?: string | null
 }): Promise<void> {
   try {
-    const supabase = await createServerClient()
+    const supabase = createAdminClient()
     await supabase.from('admin_login_logs').insert({
       user_id: params.userId || null,
       email: params.email,
@@ -66,7 +66,7 @@ async function createLoginLog(params: {
  * Returns null if not found or inactive.
  */
 async function findAdminUser(email: string): Promise<AdminUser | null> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const { data } = await supabase
     .from('admin_users')
     .select('*')
@@ -234,7 +234,7 @@ export async function handleVerifyOtp(
   }
 
   // Update last login
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   await supabase
     .from('admin_users')
     .update({ last_login_at: new Date().toISOString() })

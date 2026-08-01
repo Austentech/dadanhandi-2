@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { validateSession } from '@/services/admin/admin-session-service'
-import { createServerClient } from '@/lib/supabase/client-server'
+import { createAdminClient } from '@/lib/supabase/client-admin'
 import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 export async function GET(request: Request) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 50)
 
-    const supabase = await createServerClient()
+    const supabase = createAdminClient()
     const offset = (page - 1) * limit
 
     const { data: logs, error, count } = await supabase

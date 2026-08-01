@@ -5,7 +5,7 @@
  */
 
 import crypto from 'crypto'
-import { createServerClient } from '@/lib/supabase/client-server'
+import { createAdminClient } from '@/lib/supabase/client-admin'
 import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 // ============================================================================
@@ -57,7 +57,7 @@ function timingSafeEqualHex(a: string, b: string): boolean {
  * Deletes any previous unused OTPs for this email first.
  */
 export async function storeOtp(email: string, otp: string): Promise<void> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const otpHash = hashOtp(otp)
   const expiresAt = new Date(Date.now() + ADMIN_CONFIG.OTP_EXPIRY_SECONDS * 1000).toISOString()
 
@@ -96,7 +96,7 @@ export interface OtpVerifyResult {
  * Marks as verified on success, increments attempts on failure.
  */
 export async function verifyOtp(email: string, otp: string): Promise<OtpVerifyResult> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
 
   // Fetch the latest unverified OTP for this email
   const { data: record, error } = await supabase
@@ -150,7 +150,7 @@ export async function verifyOtp(email: string, otp: string): Promise<OtpVerifyRe
  * Delete expired OTPs older than 24 hours.
  */
 export async function cleanupExpiredOtps(): Promise<void> {
-  const supabase = await createServerClient()
+  const supabase = createAdminClient()
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   await supabase.from('admin_otps').delete().lt('created_at', cutoff)
 }

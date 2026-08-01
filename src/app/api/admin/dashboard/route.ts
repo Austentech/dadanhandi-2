@@ -5,11 +5,11 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/client-server'
+import { createAdminClient } from '@/lib/supabase/client-admin'
 
 export async function GET() {
   try {
-    const supabase = await createServerClient()
+    const supabase = createAdminClient()
 
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)

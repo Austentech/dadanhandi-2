@@ -6567,36 +6567,45 @@ a, p, span, div {
   color: #1e293b;
 }
 
-/* OTP Input */
+/* OTP Input — visual boxes (single hidden input behind) */
 .admin-otp-container {
   display: flex;
   gap: 8px;
   justify-content: center;
   margin: 20px 0;
+  position: relative;
+  cursor: text;
 }
 
-.admin-otp-input {
+.admin-otp-box {
   width: 48px;
   height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 1.4rem;
   font-weight: 700;
   border: 1.5px solid #e2e8f0;
   border-radius: 10px;
-  outline: none;
   color: #0f172a;
   font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
   background: #f8fafc;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  user-select: none;
 }
 
-.admin-otp-input:focus {
-  border-color: #3b82f6;
+.admin-otp-container:focus-within .admin-otp-box {
+  border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  background: #fff;
 }
 
-.admin-otp-input.error {
+.admin-otp-box.filled {
+  background: #fff;
+  border-color: #3b82f6;
+}
+
+.admin-otp-box.error {
   border-color: #ef4444;
 }
 

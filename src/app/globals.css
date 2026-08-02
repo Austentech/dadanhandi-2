@@ -6887,6 +6887,41 @@ a, p, span, div {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
+/* ---- Overdue Order Card ---- */
+.admin-order-card-overdue {
+  border-left: 4px solid #ef4444;
+  background: #fff5f5;
+}
+
+.admin-order-card-overdue:hover {
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.12);
+}
+
+.admin-overdue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  animation: admin-overdue-pulse 2s ease-in-out infinite;
+}
+
+@keyframes admin-overdue-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.admin-order-card-overdue .admin-order-card-meta {
+  background: #fef7f7;
+}
+
 .admin-order-card-header {
   display: flex;
   align-items: flex-start;
@@ -7291,6 +7326,15 @@ a, p, span, div {
   .admin-order-card {
     padding: 16px;
     gap: 12px;
+  }
+
+  .admin-order-card-overdue {
+    border-left-width: 3px;
+  }
+
+  .admin-overdue-badge {
+    font-size: 0.62rem;
+    padding: 1px 8px;
   }
 
   .admin-order-card-footer {

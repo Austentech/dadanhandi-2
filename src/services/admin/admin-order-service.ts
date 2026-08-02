@@ -93,30 +93,40 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           .gte('created_at', todayStartUTC.toISOString()),
       ])
 
-    // --- Pending (Current Queue): confirmed + paid + in preparation window ---
-    // Uses indexed columns: order_status, payment_status, pickup_date
+    // --- Pending (Current Queue): confirmed + paid + in preparation window + overdue ---
+    // Includes: orders in window + overdue (slot passed) + past-date unaccepted
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any
 
-    // Pending: pickup today, slot_start within [windowStart, windowEnd]
-    const { count: pendingCount } = await sb
+    const windowEndStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
+
+    // Pending today: in-window + overdue (slot <= windowEnd, no lower bound)
+    const { count: pendingTodayCount } = await sb
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('order_status', 'confirmed')
       .eq('payment_status', 'succeeded')
       .eq('pickup_date', bounds.todayDateStr)
-      .gte('pickup_slot_start', `${String(Math.floor(bounds.windowStartMinutes / 60)).padStart(2, '0')}:${String(bounds.windowStartMinutes % 60).padStart(2, '0')}:00`)
-      .lte('pickup_slot_start', `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`)
+      .lte('pickup_slot_start', windowEndStr)
+
+    // Pending past: overdue from yesterday or earlier
+    const { count: pendingPastCount } = await sb
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('order_status', 'confirmed')
+      .eq('payment_status', 'succeeded')
+      .lt('pickup_date', bounds.todayDateStr)
+
+    const pendingCount = (pendingTodayCount || 0) + (pendingPastCount || 0)
 
     // --- Upcoming: confirmed + paid + today + AFTER preparation window ---
-    const windowEndTimeStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
     const { count: upcomingCount } = await sb
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('order_status', 'confirmed')
       .eq('payment_status', 'succeeded')
       .eq('pickup_date', bounds.todayDateStr)
-      .gt('pickup_slot_start', windowEndTimeStr)
+      .gt('pickup_slot_start', windowEndStr)
 
     return {
       success: true,
@@ -257,6 +267,11 @@ export interface AdminOrderWithItems extends AdminOrderItem {
     whatsappNumber: string | null
     mobileNumber: string | null
   } | null
+  /**
+   * True if the pickup slot has already passed but the order
+   * was never accepted by admin. Computed server-side.
+   */
+  isOverdue?: boolean
 }
 
 export interface ListOrdersResult {
@@ -320,8 +335,11 @@ function mapOrderItemRow(raw: RawOrderItemRow): AdminOrderItemDetail {
  * List orders with a given status, including items and customer info.
  * For 'confirmed' status:
  *   - Only shows PAID orders (payment_status='succeeded')
- *   - Only shows orders within the PREPARATION WINDOW (server-time based)
- *   - Orders with future pickup slots are HIDDEN until their window begins
+ *   - Shows orders in the preparation window (current queue)
+ *   - Shows OVERDUE orders whose pickup slot has already passed (never accepted)
+ *   - Shows past-date orders (yesterday or earlier, still confirmed + paid)
+ *   - Orders with FUTURE pickup slots are HIDDEN until their window begins
+ *   - Each order includes an `isOverdue` flag computed server-side
  */
 export async function listOrdersByStatus(
   status: AdminOrderStatus,
@@ -340,44 +358,99 @@ export async function listOrdersByStatus(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any
 
-    let query = sb
-      .from('orders')
-      .select(`
-        *,
-        order_items (*),
-        branches (name, slug, city)
-      `, { count: 'exact' })
-      .eq('order_status', status)
+    const selectFields = `
+      *,
+      order_items (*),
+      branches (name, slug, city)
+    `
 
-    // For 'confirmed' status: only show PAID orders within preparation window
+    let orders: RawOrderRow[]
+    let totalCount: number
+    // Store window bounds for isOverdue computation (only for confirmed)
+    let windowStartMinutes: number | null = null
+    let todayDateStr: string | null = null
+
     if (status === 'confirmed') {
-      query = query.eq('payment_status', 'succeeded')
+      // --- Confirmed orders: two-query approach ---
+      // 1. Today's orders: in-window + overdue (no lower bound on slot)
+      // 2. Past-date overdue: pickup_date < today
+      // Future orders (slot after window end) are excluded.
 
-      // Apply preparation window filter (server-time based)
       const bounds = getPreparationWindowBounds()
-      const windowStartStr = `${String(Math.floor(bounds.windowStartMinutes / 60)).padStart(2, '0')}:${String(bounds.windowStartMinutes % 60).padStart(2, '0')}:00`
+      windowStartMinutes = bounds.windowStartMinutes
+      todayDateStr = bounds.todayDateStr
+
       const windowEndStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
 
-      query = query
+      // Query 1: Today — in-window + overdue (slot <= windowEnd, no .gte lower bound)
+      let todayQ = sb
+        .from('orders')
+        .select(selectFields, { count: 'exact' })
+        .eq('order_status', 'confirmed')
+        .eq('payment_status', 'succeeded')
         .eq('pickup_date', bounds.todayDateStr)
-        .gte('pickup_slot_start', windowStartStr)
         .lte('pickup_slot_start', windowEndStr)
+        .order('pickup_slot_start', { ascending: true })
+
+      // Query 2: Past-date overdue (yesterday or earlier, never accepted)
+      let pastQ = sb
+        .from('orders')
+        .select(selectFields)
+        .eq('order_status', 'confirmed')
+        .eq('payment_status', 'succeeded')
+        .lt('pickup_date', bounds.todayDateStr)
+        .order('pickup_date', { ascending: false })
+        .order('pickup_slot_start', { ascending: false })
+        .limit(50) // Safety limit for very old overdue orders
+
+      // Apply optional branch filter to both queries
+      if (options?.branchSlug) {
+        todayQ = todayQ.eq('branch_id', options.branchSlug)
+        pastQ = pastQ.eq('branch_id', options.branchSlug)
+      }
+
+      const [todayRes, pastRes] = await Promise.all([todayQ, pastQ])
+
+      if (todayRes.error) {
+        console.error('[ADMIN ORDER SERVICE] listOrdersByStatus today query error:', todayRes.error)
+        return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch orders' }
+      }
+
+      const todayOrders = (todayRes.data || []) as RawOrderRow[]
+      const pastOrders = (pastRes.data || []) as RawOrderRow[]
+
+      // Merge: past overdue first (most recent past first), then today's
+      orders = [...pastOrders, ...todayOrders]
+      totalCount = (todayRes.count || 0) + pastOrders.length
+    } else {
+      // --- Non-confirmed: simple single query ---
+      let query = sb
+        .from('orders')
+        .select(selectFields, { count: 'exact' })
+        .eq('order_status', status)
+
+      query = query
+        .order('pickup_slot_start', { ascending: true })
+        .range(offset, offset + limit - 1)
+
+      if (options?.branchSlug) {
+        query = query.eq('branch_id', options.branchSlug)
+      }
+
+      const { data, error, count } = await query
+
+      if (error) {
+        console.error('[ADMIN ORDER SERVICE] listOrdersByStatus error:', error)
+        return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch orders' }
+      }
+
+      orders = (data || []) as RawOrderRow[]
+      totalCount = count || 0
     }
 
-    query = query
-      .order('pickup_slot_start', { ascending: true })  // Sort by pickup time (soonest first)
-      .range(offset, offset + limit - 1)
-
-    // Optional: filter by branch
-    if (options?.branchSlug) {
-      query = query.eq('branch_id', options.branchSlug)
-    }
-
-    const { data: orders, error, count } = await query
-
-    if (error) {
-      console.error('[ADMIN ORDER SERVICE] listOrdersByStatus error:', error)
-      return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch orders' }
+    // Apply pagination (for confirmed, we already have all orders merged)
+    if (status === 'confirmed') {
+      orders = orders.slice(offset, offset + limit)
     }
 
     if (!orders || orders.length === 0) {
@@ -412,6 +485,18 @@ export async function listOrdersByStatus(
       })
     }
 
+    // Helper: compute isOverdue for a confirmed order (server-side, using window bounds)
+    const computeIsOverdue = (raw: RawOrderRow): boolean => {
+      if (windowStartMinutes === null || todayDateStr === null) return false
+      // Past-date orders are always overdue
+      if (raw.pickup_date < todayDateStr) return true
+      // Today's orders: overdue if slot started before the window
+      const [h, m] = raw.pickup_slot_start.split(':').map(Number)
+      if (isNaN(h) || isNaN(m)) return false
+      const slotMinutes = h * 60 + m
+      return slotMinutes < windowStartMinutes
+    }
+
     // Map to typed response with proper snake_case -> camelCase conversion
     const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
       const profile = profileMap.get(o.user_id)
@@ -422,13 +507,14 @@ export async function listOrdersByStatus(
         items: (o.order_items || []).map(mapOrderItemRow),
         branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
         customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
+        isOverdue: status === 'confirmed' ? computeIsOverdue(o) : undefined,
       }
     })
 
     return {
       success: true,
       orders: mapped,
-      totalCount: count || 0,
+      totalCount,
     }
   } catch (err) {
     console.error('[ADMIN ORDER SERVICE] listOrdersByStatus error:', err)

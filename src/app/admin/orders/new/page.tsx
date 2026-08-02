@@ -17,6 +17,7 @@ import {
   MapPin,
   User,
   CreditCard,
+  Clock,
 } from 'lucide-react'
 import type { AdminOrderWithItems } from '@/services/admin/admin-order-service'
 
@@ -122,11 +123,23 @@ function OrderCard({
   const branchContact = order.branch?.slug ? getBranchContact(order.branch.slug) : null
 
   return (
-    <div className="admin-order-card" role="article" aria-label={`Order ${order.orderNumber}`}>
+    <div
+      className={`admin-order-card${order.isOverdue ? ' admin-order-card-overdue' : ''}`}
+      role="article"
+      aria-label={`Order ${order.orderNumber}${order.isOverdue ? ', overdue — pickup slot has passed' : ''}`}
+    >
       {/* Header row */}
       <div className="admin-order-card-header">
         <div className="admin-order-card-id">
-          <span className="admin-order-number">#{order.orderNumber}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className="admin-order-number">#{order.orderNumber}</span>
+            {order.isOverdue && (
+              <span className="admin-overdue-badge" aria-label="Overdue order">
+                <Clock size={11} />
+                Overdue
+              </span>
+            )}
+          </div>
           <span className="admin-order-time">{timeAgo(order.createdAt)}</span>
         </div>
         <div className="admin-order-card-amount">{formatPaise(order.finalAmountPaise)}</div>
@@ -431,7 +444,7 @@ export default function NewOrdersPage() {
     <AdminShell>
       <h1 className="admin-page-title">New Orders</h1>
       <p className="admin-page-subtitle">
-        Paid orders in current preparation window
+        Paid orders awaiting acceptance
         {orders.length > 0 && (
           <span className="admin-order-count-badge">{orders.length}</span>
         )}
@@ -485,12 +498,12 @@ export default function NewOrdersPage() {
           <div className="admin-empty-state">
             <Package size={56} className="admin-empty-state-icon" />
             <div className="admin-empty-state-title">
-              {search ? 'No matching orders' : 'No orders in current queue'}
+              {search ? 'No matching orders' : 'No pending orders'}
             </div>
             <div className="admin-empty-state-desc">
               {search
                 ? 'Try adjusting your search terms.'
-                : 'Orders will appear here when they enter the preparation window before their pickup time.'}
+                : 'All paid orders have been accepted. New orders will appear here when they enter the preparation window or if any pickup slot is missed.'}
             </div>
           </div>
         </div>

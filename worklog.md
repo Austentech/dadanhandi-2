@@ -550,3 +550,29 @@ Stage Summary:
 - Branch contacts are centrally managed with click-to-call on all devices
 - All endpoints protected with auth + centralized rate limiting
 - No TypeScript errors in any new/modified files
+---
+Task ID: 1
+Agent: main
+Task: Show overdue orders in New Orders page when pickup slot passed but admin hasn't accepted
+
+Work Log:
+- Read and analyzed admin-order-service.ts, admin-scheduling-service.ts, new orders page, config, globals.css
+- Identified root cause: `listOrdersByStatus` had `.gte('pickup_slot_start', windowStartStr)` which hid orders whose slot had already passed
+- Added `isOverdue?: boolean` field to `AdminOrderWithItems` type
+- Rewrote `listOrdersByStatus` for 'confirmed' status to use two parallel queries:
+  - Query 1: Today's orders with slot <= windowEnd (includes both in-window and overdue, no lower bound)
+  - Query 2: Past-date orders (pickup_date < today) for yesterday/earlier unaccepted orders
+- Added `computeIsOverdue` helper: past-date orders always overdue; today's orders overdue if slot < windowStart
+- Updated `getDashboardStats` pending count to include both today's overdue and past-date overdue
+- Updated New Orders page: added Clock icon import, overdue badge with pulse animation, conditional card styling
+- Added CSS: `.admin-order-card-overdue` (red left border, tinted background), `.admin-overdue-badge` (red pill with pulse), responsive adjustments
+- Changed page subtitle from "in current preparation window" to "awaiting acceptance"
+- Updated empty state message
+- Build verified: `next build` succeeds
+
+Stage Summary:
+- Overdue orders (missed pickup slots + past-date unaccepted) now always appear in New Orders
+- Server-side `isOverdue` flag computed using preparation window bounds
+- Visual: red left border, tinted background, pulsing "OVERDUE" badge on each overdue card
+- Dashboard pending count now includes overdue orders
+- Files changed: admin-order-service.ts, new/page.tsx, globals.css

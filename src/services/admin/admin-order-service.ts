@@ -2,10 +2,16 @@
  * Admin Order Service
  * Handles admin-side order operations: listing, status transitions, stats.
  * All database access uses the service_role client to bypass RLS.
+ *
+ * Phase 3 Module 3: Integrated preparation window scheduling.
+ * - Dashboard "Pending" = confirmed + paid + in preparation window
+ * - Dashboard "Upcoming" = confirmed + paid + today + AFTER preparation window
+ * - New Orders list only shows orders within the preparation window
  */
 
 import { createAdminClient } from '@/lib/supabase/client-admin'
 import type { DashboardStats } from '@/store/admin-store'
+import { getPreparationWindowBounds } from './admin-scheduling-service'
 
 // ============================================================================
 // TYPES
@@ -45,28 +51,29 @@ export interface DashboardStatsResult {
 /**
  * Fetch dashboard statistics from the database.
  * Returns counts for each order status category.
+ *
+ * IMPORTANT: "Pending" and "Upcoming" now use the preparation window.
+ *   - Pending (Current Queue): confirmed + paid + pickup slot within window
+ *   - Upcoming: confirmed + paid + today + pickup slot AFTER window
  */
 export async function getDashboardStats(): Promise<DashboardStatsResult> {
   try {
     const supabase = createAdminClient()
+    const bounds = getPreparationWindowBounds()
 
     // Get today's date range in IST
     const now = new Date()
     const istOffset = 5.5 * 60 * 60 * 1000
     const istTime = new Date(now.getTime() + istOffset)
     const todayStart = new Date(istTime.getFullYear(), istTime.getMonth(), istTime.getDate())
-    // Convert back to UTC for the query
     const todayStartUTC = new Date(todayStart.getTime() - istOffset)
 
-    const [todayRes, confirmedRes, acceptedRes, preparingRes, readyRes, completedRes, cancelledRes] =
+    const [todayRes, acceptedRes, preparingRes, readyRes, completedRes, cancelledRes] =
       await Promise.all([
         // Today's orders (all non-draft statuses)
         supabase.from('orders').select('id', { count: 'exact', head: true })
           .neq('order_status', 'draft')
           .gte('created_at', todayStartUTC.toISOString()),
-        // Pending = confirmed (paid but not yet accepted by admin)
-        supabase.from('orders').select('id', { count: 'exact', head: true })
-          .eq('order_status', 'confirmed'),
         // Accepted
         supabase.from('orders').select('id', { count: 'exact', head: true })
           .eq('order_status', 'accepted'),
@@ -86,21 +93,36 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           .gte('created_at', todayStartUTC.toISOString()),
       ])
 
-    // Upcoming = confirmed orders with pickup slot starting within 2 hours
-    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000)
-    // Build today's date string for pickup_date comparison
-    const todayDateStr = todayStart.toISOString().split('T')[0]
-    const { count: upcomingCount } = await supabase
+    // --- Pending (Current Queue): confirmed + paid + in preparation window ---
+    // Uses indexed columns: order_status, payment_status, pickup_date
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+
+    // Pending: pickup today, slot_start within [windowStart, windowEnd]
+    const { count: pendingCount } = await sb
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('order_status', 'confirmed')
-      .eq('pickup_date', todayDateStr)
+      .eq('payment_status', 'succeeded')
+      .eq('pickup_date', bounds.todayDateStr)
+      .gte('pickup_slot_start', `${String(Math.floor(bounds.windowStartMinutes / 60)).padStart(2, '0')}:${String(bounds.windowStartMinutes % 60).padStart(2, '0')}:00`)
+      .lte('pickup_slot_start', `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`)
+
+    // --- Upcoming: confirmed + paid + today + AFTER preparation window ---
+    const windowEndTimeStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
+    const { count: upcomingCount } = await sb
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('order_status', 'confirmed')
+      .eq('payment_status', 'succeeded')
+      .eq('pickup_date', bounds.todayDateStr)
+      .gt('pickup_slot_start', windowEndTimeStr)
 
     return {
       success: true,
       stats: {
         todayOrders: todayRes.count || 0,
-        pendingOrders: confirmedRes.count || 0,
+        pendingOrders: pendingCount || 0,
         acceptedOrders: acceptedRes.count || 0,
         preparingOrders: preparingRes.count || 0,
         readyOrders: readyRes.count || 0,
@@ -296,8 +318,10 @@ function mapOrderItemRow(raw: RawOrderItemRow): AdminOrderItemDetail {
 
 /**
  * List orders with a given status, including items and customer info.
- * For 'confirmed' status, also filters by payment_status='succeeded' to
- * ensure only PAID orders appear in the New Orders list.
+ * For 'confirmed' status:
+ *   - Only shows PAID orders (payment_status='succeeded')
+ *   - Only shows orders within the PREPARATION WINDOW (server-time based)
+ *   - Orders with future pickup slots are HIDDEN until their window begins
  */
 export async function listOrdersByStatus(
   status: AdminOrderStatus,
@@ -313,7 +337,10 @@ export async function listOrdersByStatus(
     const limit = options?.limit || 50
     const offset = options?.offset || 0
 
-    let query = supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+
+    let query = sb
       .from('orders')
       .select(`
         *,
@@ -322,13 +349,23 @@ export async function listOrdersByStatus(
       `, { count: 'exact' })
       .eq('order_status', status)
 
-    // For 'confirmed' status: only show PAID orders
+    // For 'confirmed' status: only show PAID orders within preparation window
     if (status === 'confirmed') {
       query = query.eq('payment_status', 'succeeded')
+
+      // Apply preparation window filter (server-time based)
+      const bounds = getPreparationWindowBounds()
+      const windowStartStr = `${String(Math.floor(bounds.windowStartMinutes / 60)).padStart(2, '0')}:${String(bounds.windowStartMinutes % 60).padStart(2, '0')}:00`
+      const windowEndStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
+
+      query = query
+        .eq('pickup_date', bounds.todayDateStr)
+        .gte('pickup_slot_start', windowStartStr)
+        .lte('pickup_slot_start', windowEndStr)
     }
 
     query = query
-      .order('created_at', { ascending: false })
+      .order('pickup_slot_start', { ascending: true })  // Sort by pickup time (soonest first)
       .range(offset, offset + limit - 1)
 
     // Optional: filter by branch

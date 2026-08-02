@@ -525,3 +525,28 @@ Stage Summary:
 - Logo consistent across customer + admin
 - Real-time dashboard via Supabase Realtime postgres_changes
 - Accept order is idempotent, race-condition safe, server-validated
+
+---
+Task ID: 3-3
+Agent: Main Agent
+Task: Phase 3 Module 3 — Intelligent Order Queue, Time-Slot Scheduling & Branch Communication
+
+Work Log:
+- Created centralized branch contacts config (src/lib/admin/branch-contacts.ts) with 4 branches and phone formatting
+- Added PREPARATION_WINDOW_HOURS=1 and centralized rate limits to ADMIN_CONFIG
+- Built reusable admin-scheduling-service.ts: server-time IST order visibility engine with getPreparationWindowBounds(), isOrderInPreparationWindow(), isUpcomingOrder()
+- Rewrote admin-order-service.ts dashboard stats: pendingOrders = in-window confirmed+paid, upcomingOrders = after-window confirmed+paid (DB queries with indexed columns)
+- Rewrote listOrdersByStatus: for confirmed status, applies pickup_date + pickup_slot_start window filter server-side, sorted by pickup_slot_start ASC
+- Updated dashboard page: renamed Pending to Current Queue with subtitle, added Upcoming Orders as main stat card, reorganized quick info
+- Updated New Orders page: added branch manager contact row with click-to-call tel: links, payment method badge, auto-refresh every 60s for window advancement
+- Updated dashboard and orders/list API routes to use centralized rate limit config
+- Added CSS: .admin-branch-contact-*, .admin-payment-method-badge, .admin-stat-subtitle, .admin-stat-icon.orange, responsive rules for 480px
+- Created comprehensive documentation at docs/phase3-module3.md
+
+Stage Summary:
+- Preparation window scheduling is fully server-side and configurable via single config value
+- Dashboard accurately splits pending (current queue) vs upcoming (future) orders
+- New Orders page only shows paid orders within the preparation window, sorted by pickup time
+- Branch contacts are centrally managed with click-to-call on all devices
+- All endpoints protected with auth + centralized rate limiting
+- No TypeScript errors in any new/modified files

@@ -7192,6 +7192,95 @@ a, p, span, div {
   color: #92400e;
 }
 
+/* ---- Branch Manager Contact ---- */
+.admin-branch-contact-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #1e40af !important;
+  text-decoration: none;
+  padding: 4px 8px;
+  margin: -2px -8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.admin-branch-contact-link:hover {
+  background: #eff6ff;
+  color: #1e3a8a !important;
+  text-decoration: none;
+}
+
+.admin-branch-contact-link:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.admin-branch-manager-icon {
+  flex-shrink: 0;
+  color: #6366f1;
+}
+
+.admin-branch-contact-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-branch-contact-name {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.admin-branch-contact-phone {
+  font-weight: 600;
+  color: #1e40af;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.admin-branch-call-icon {
+  flex-shrink: 0;
+  color: #3b82f6;
+  margin-left: auto;
+}
+
+/* ---- Payment Method Badge ---- */
+.admin-payment-method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+/* ---- Stat Card Subtitle ---- */
+.admin-stat-subtitle {
+  display: block;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 400;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+/* ---- Stat Card orange icon ---- */
+.admin-stat-icon.orange {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
 /* ---- Responsive: Order Cards ---- */
 @media (max-width: 768px) {
   .admin-orders-grid {
@@ -7234,6 +7323,20 @@ a, p, span, div {
 
   .admin-order-item-variant {
     display: none;
+  }
+
+  .admin-branch-contact-text {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .admin-branch-contact-name {
+    font-size: 0.68rem;
+  }
+
+  .admin-branch-contact-phone {
+    font-size: 0.75rem;
   }
 
   .admin-filter-bar {

@@ -1,20 +1,22 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import AdminShell from '@/components/admin/AdminShell'
 import { useAdminDashboard } from '@/hooks/use-admin-dashboard'
+import { getBranchContact, formatPhoneDisplay } from '@/lib/admin/branch-contacts'
 import {
   Package,
   Search,
   Phone,
   CheckCircle,
   XCircle,
-  Clock,
   Leaf,
   Gift,
   Coins,
   RefreshCw,
+  MapPin,
+  User,
+  CreditCard,
 } from 'lucide-react'
 import type { AdminOrderWithItems } from '@/services/admin/admin-order-service'
 
@@ -30,7 +32,6 @@ function formatPaise(paise: number): string {
 /** Format a time value (ISO string, timestamptz, or HH:MM:SS) to readable time */
 function formatTime(value: string): string {
   try {
-    // Handle bare time strings like "14:30:00" (Postgres TIME type)
     if (/^\d{1,2}:\d{2}/.test(value) && !value.includes('T') && !value.includes('Z')) {
       const [h, m] = value.split(':').map(Number)
       const date = new Date()
@@ -42,7 +43,6 @@ function formatTime(value: string): string {
         timeZone: 'Asia/Kolkata',
       })
     }
-    // Handle ISO timestamptz strings
     return new Date(value).toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
@@ -57,7 +57,6 @@ function formatTime(value: string): string {
 /** Format a date value (ISO string or YYYY-MM-DD) to readable date */
 function formatDate(value: string): string {
   try {
-    // Handle bare date strings like "2026-08-02" (Postgres DATE type)
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
       const [y, m, d] = value.split('-').map(Number)
       const date = new Date(y, m - 1, d)
@@ -68,7 +67,6 @@ function formatDate(value: string): string {
         timeZone: 'Asia/Kolkata',
       })
     }
-    // Handle ISO timestamptz strings
     return new Date(value).toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
@@ -96,6 +94,13 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+/** Format payment method for display */
+function formatPaymentMethod(method: string | null): string {
+  if (!method) return 'Online'
+  if (method === 'razorpay' || method === 'online') return 'Razorpay'
+  return method.charAt(0).toUpperCase() + method.slice(1)
+}
+
 // ---------------------------------------------------------------------------
 // Order Card Component
 // ---------------------------------------------------------------------------
@@ -112,6 +117,9 @@ function OrderCard({
   const isAccepting = acceptingId === order.id
   const totalDonation = order.donationPlantationPaise + order.donationHungerPaise
   const hasReward = order.rewardPointsRedeemed > 0
+
+  // Look up branch contact from centralized config
+  const branchContact = order.branch?.slug ? getBranchContact(order.branch.slug) : null
 
   return (
     <div className="admin-order-card" role="article" aria-label={`Order ${order.orderNumber}`}>
@@ -135,7 +143,7 @@ function OrderCard({
           <a
             href={`tel:${order.customer.whatsappNumber}`}
             className="admin-order-meta-row admin-order-phone-link"
-            aria-label={`Call ${order.customer.name} at ${order.customer.whatsappNumber}`}
+            aria-label={`Call customer ${order.customer.name} at ${order.customer.whatsappNumber}`}
           >
             <Phone size={13} />
             <span>{order.customer.whatsappNumber}</span>
@@ -145,9 +153,25 @@ function OrderCard({
         <div className="admin-order-meta-row">
           <span className="admin-order-meta-label">Branch</span>
           <span className="admin-order-meta-value">
-            {order.branch?.name || order.branchId}
+            {order.branch?.name || 'Unknown Branch'}
           </span>
         </div>
+
+        {/* Branch Manager Contact — centralized config */}
+        {branchContact && (
+          <a
+            href={`tel:${branchContact.managerPhone}`}
+            className="admin-order-meta-row admin-branch-contact-link"
+            aria-label={`Call ${branchContact.name} manager at ${formatPhoneDisplay(branchContact.managerPhone)}`}
+          >
+            <User size={13} className="admin-branch-manager-icon" />
+            <span className="admin-branch-contact-text">
+              <span className="admin-branch-contact-name">{branchContact.managerName}</span>
+              <span className="admin-branch-contact-phone">{formatPhoneDisplay(branchContact.managerPhone)}</span>
+            </span>
+            <Phone size={13} className="admin-branch-call-icon" aria-hidden="true" />
+          </a>
+        )}
 
         <div className="admin-order-meta-row">
           <span className="admin-order-meta-label">Pickup</span>
@@ -216,12 +240,18 @@ function OrderCard({
         )}
       </div>
 
-      {/* Payment status */}
+      {/* Payment status + method */}
       <div className="admin-order-card-footer">
         <div className="admin-order-payment-status">
-          <span className={`admin-payment-badge ${order.paymentStatus === 'succeeded' ? 'paid' : 'pending'}`}>
-            {order.paymentStatus === 'succeeded' ? 'Paid' : 'Payment Pending'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span className={`admin-payment-badge ${order.paymentStatus === 'succeeded' ? 'paid' : 'pending'}`}>
+              {order.paymentStatus === 'succeeded' ? 'Paid' : 'Payment Pending'}
+            </span>
+            <span className="admin-payment-method-badge">
+              <CreditCard size={11} />
+              {formatPaymentMethod(order.paymentMethod)}
+            </span>
+          </div>
           <span className="admin-order-created-at">
             Ordered {formatTime(order.createdAt)}
           </span>
@@ -268,7 +298,6 @@ function OrderCard({
 // ---------------------------------------------------------------------------
 
 export default function NewOrdersPage() {
-  const router = useRouter()
   const [orders, setOrders] = useState<AdminOrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -277,7 +306,7 @@ export default function NewOrdersPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const { refresh: refreshDashboard } = useAdminDashboard()
 
-  // Fetch orders
+  // Fetch orders (server applies preparation window filter)
   const fetchOrders = useCallback(async (searchQuery?: string) => {
     setLoading(true)
     setError(null)
@@ -303,7 +332,6 @@ export default function NewOrdersPage() {
   useEffect(() => {
     fetchOrders()
 
-    // Subscribe to realtime changes on orders table
     let cleanup: (() => void) | null = null
 
     ;(async () => {
@@ -347,6 +375,15 @@ export default function NewOrdersPage() {
     return () => { cleanup?.() }
   }, [fetchOrders, search, refreshDashboard])
 
+  // Auto-refresh every 60 seconds to catch preparation window changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders(search)
+      refreshDashboard()
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [fetchOrders, search, refreshDashboard])
+
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value)
@@ -367,9 +404,7 @@ export default function NewOrdersPage() {
       })
       const data = await res.json()
       if (data.success) {
-        // Remove from list immediately (optimistic)
         setOrders((prev) => prev.filter((o) => o.id !== orderId))
-        // Refresh dashboard stats
         refreshDashboard()
       } else {
         alert(data.message || 'Failed to accept order')
@@ -381,7 +416,7 @@ export default function NewOrdersPage() {
     }
   }, [refreshDashboard])
 
-  // Filter orders client-side by search (for instant response before server response)
+  // Client-side search filter (instant response before server round-trip)
   const displayOrders = search
     ? orders.filter((o) => {
         const q = search.toLowerCase()
@@ -396,7 +431,7 @@ export default function NewOrdersPage() {
     <AdminShell>
       <h1 className="admin-page-title">New Orders</h1>
       <p className="admin-page-subtitle">
-        Paid orders awaiting acceptance
+        Paid orders in current preparation window
         {orders.length > 0 && (
           <span className="admin-order-count-badge">{orders.length}</span>
         )}
@@ -405,10 +440,7 @@ export default function NewOrdersPage() {
       {/* Filter Bar */}
       <div className="admin-filter-bar">
         <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
-          <Search
-            size={16}
-            className="admin-filter-search-icon"
-          />
+          <Search size={16} className="admin-filter-search-icon" />
           <input
             type="text"
             placeholder="Search by order # or customer name..."
@@ -453,12 +485,12 @@ export default function NewOrdersPage() {
           <div className="admin-empty-state">
             <Package size={56} className="admin-empty-state-icon" />
             <div className="admin-empty-state-title">
-              {search ? 'No matching orders' : 'No new orders'}
+              {search ? 'No matching orders' : 'No orders in current queue'}
             </div>
             <div className="admin-empty-state-desc">
               {search
                 ? 'Try adjusting your search terms.'
-                : "When customers place paid orders, they'll appear here for you to review and accept."}
+                : 'Orders will appear here when they enter the preparation window before their pickup time.'}
             </div>
           </div>
         </div>

@@ -8,12 +8,13 @@
 import { NextResponse } from 'next/server'
 import { validateAdminRequest } from '@/lib/admin/auth-helpers'
 import { getDashboardStats } from '@/services/admin/admin-order-service'
+import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 export async function GET(request: Request) {
-  // Auth + rate limit
+  // Auth + rate limit (uses centralized config)
   const auth = await validateAdminRequest(request, {
     rateLimitType: 'admin_dashboard',
-    rateLimitConfig: { maxAttempts: 60, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
+    rateLimitConfig: ADMIN_CONFIG.RATE_LIMITS.DASHBOARD,
   })
   if (!auth.valid) return auth.errorResponse!
 

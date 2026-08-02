@@ -11,6 +11,7 @@ import {
   ChefHat,
   PackageCheck,
   AlertCircle,
+  CalendarClock,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -22,12 +23,14 @@ function StatCard({
   label,
   value,
   loading,
+  subtitle,
 }: {
   icon: React.ReactNode
-   iconBg: string
-   label: string
-   value: number
-   loading: boolean
+  iconBg: string
+  label: string
+  value: number
+  loading: boolean
+  subtitle?: string
 }) {
   return (
     <div className="admin-stat-card">
@@ -35,6 +38,7 @@ function StatCard({
       <div className="admin-stat-info">
         <span className="admin-stat-label">{label}</span>
         <span className="admin-stat-value">{loading ? '—' : value}</span>
+        {subtitle && <span className="admin-stat-subtitle">{subtitle}</span>}
       </div>
     </div>
   )
@@ -74,9 +78,18 @@ export default function DashboardPage() {
         <StatCard
           icon={<Clock size={22} />}
           iconBg="amber"
-          label="Pending"
+          label="Current Queue"
           value={stats.pendingOrders}
           loading={loading}
+          subtitle="Paid, in preparation window"
+        />
+        <StatCard
+          icon={<CalendarClock size={22} />}
+          iconBg="orange"
+          label="Upcoming Orders"
+          value={stats.upcomingOrders}
+          loading={loading}
+          subtitle="Paid, after preparation window"
         />
         <StatCard
           icon={<Truck size={22} />}
@@ -85,6 +98,10 @@ export default function DashboardPage() {
           value={stats.acceptedOrders + stats.preparingOrders + stats.readyOrders}
           loading={loading}
         />
+      </div>
+
+      {/* Stat Cards — Row 2: Detailed breakdown */}
+      <div className="admin-stat-grid">
         <StatCard
           icon={<CheckCircle size={22} />}
           iconBg="purple"
@@ -92,10 +109,6 @@ export default function DashboardPage() {
           value={stats.completedOrders}
           loading={loading}
         />
-      </div>
-
-      {/* Stat Cards — Row 2: Detailed breakdown */}
-      <div className="admin-stat-grid">
         <StatCard
           icon={<PackageCheck size={22} />}
           iconBg="blue"
@@ -117,28 +130,21 @@ export default function DashboardPage() {
           value={stats.readyOrders}
           loading={loading}
         />
-        <StatCard
-          icon={<XCircle size={22} />}
-          iconBg="red"
-          label="Cancelled"
-          value={stats.cancelledOrders}
-          loading={loading}
-        />
       </div>
 
       {/* Quick Info Card */}
       <div className="admin-card" style={{ marginTop: 8 }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
           gap: 16,
         }}>
           <div className="admin-quick-info">
-            <span className="admin-quick-info-label">Upcoming Orders</span>
-            <span className="admin-quick-info-value">{loading ? '—' : stats.upcomingOrders}</span>
+            <span className="admin-quick-info-label">Cancelled (Today)</span>
+            <span className="admin-quick-info-value">{loading ? '—' : stats.cancelledOrders}</span>
           </div>
           <div className="admin-quick-info">
-            <span className="admin-quick-info-label">Pending + Upcoming</span>
+            <span className="admin-quick-info-label">Current + Upcoming</span>
             <span className="admin-quick-info-value">{loading ? '—' : stats.pendingOrders + stats.upcomingOrders}</span>
           </div>
           <div className="admin-quick-info">

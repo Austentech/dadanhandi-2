@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { validateAdminRequest } from '@/lib/admin/auth-helpers'
 import { listOrdersByStatus } from '@/services/admin/admin-order-service'
+import { ADMIN_CONFIG } from '@/lib/admin/config'
 import type { AdminOrderStatus } from '@/services/admin/admin-order-service'
 
 const ALLOWED_STATUSES: AdminOrderStatus[] = [
@@ -16,7 +17,7 @@ const ALLOWED_STATUSES: AdminOrderStatus[] = [
 export async function GET(request: Request) {
   const auth = await validateAdminRequest(request, {
     rateLimitType: 'admin_orders_list',
-    rateLimitConfig: { maxAttempts: 120, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
+    rateLimitConfig: ADMIN_CONFIG.RATE_LIMITS.ORDERS_LIST,
   })
   if (!auth.valid) return auth.errorResponse!
 

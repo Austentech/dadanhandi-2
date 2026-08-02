@@ -1,6 +1,7 @@
 /**
  * Admin Panel Configuration
- * Central configuration for admin authentication, sessions, OTP, and security.
+ * Central configuration for admin authentication, sessions, OTP, security,
+ * order scheduling, and rate limiting.
  * All thresholds are configurable and environment-aware.
  */
 
@@ -31,6 +32,10 @@ export const ADMIN_CONFIG = {
     VERIFY_OTP: { maxAttempts: 10, windowMs: 60 * 1000, blockDurationMs: 15 * 60 * 1000 },
     /** General login attempts: 20 per hour, block 30 minutes */
     LOGIN_ATTEMPTS: { maxAttempts: 20, windowMs: 60 * 60 * 1000, blockDurationMs: 30 * 60 * 1000 },
+    /** Dashboard: 60 requests per minute */
+    DASHBOARD: { maxAttempts: 60, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
+    /** Order list: 120 requests per minute */
+    ORDERS_LIST: { maxAttempts: 120, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
   },
 
   /** Session: duration in hours (7 days) */
@@ -56,6 +61,20 @@ export const ADMIN_CONFIG = {
 
   /** Session token length in bytes */
   TOKEN_LENGTH: 64,
+
+  /**
+   * ORDER SCHEDULING: Preparation Window (in hours)
+   * ------------------------------------------------
+   * Orders become visible in the admin queue when their pickup slot
+   * start time falls within [now, now + PREPARATION_WINDOW_HOURS].
+   *
+   * Examples:
+   *   - 1 hour (default): at 12:00 PM, orders with pickup 12-1 PM are visible
+   *   - 2 hours: at 12:00 PM, orders with pickup 12-2 PM are visible
+   *
+   * To change the window, modify ONLY this value. No other code changes needed.
+   */
+  PREPARATION_WINDOW_HOURS: 1,
 } as const
 
 export type AdminConfig = typeof ADMIN_CONFIG

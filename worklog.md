@@ -490,3 +490,38 @@ Stage Summary:
 - No existing customer features affected
 - Admin accessible only via /admin/login (no links from customer site)
 - Next step: Run migration 007 on Supabase, then deploy to Vercel
+
+---
+Task ID: P3M2
+Agent: Main Agent
+Task: Phase 3 Module 2 — Live Dashboard, Real-Time Updates, New Orders Page, Accept Order Workflow
+
+Work Log:
+- Fixed Admin Session Freeze root cause: multiple components (AdminLoginPage, AdminShell, AdminAuthGuard) all called checkSession() simultaneously, causing concurrent API requests and state thrashing. Implemented promise-cached deduplication in admin-store.ts
+- Removed duplicate checkSession() from AdminAuthGuard — AdminShell is now the single auth checker for all protected pages
+- Fixed Logo Consistency: Admin login page and sidebar now use /images/brand-logo.png (same asset as customer Navbar and AuthModal)
+- Added CSS for sidebar logo (collapsed/mobile responsive states)
+- Created src/lib/admin/auth-helpers.ts — reusable validateAdminRequest() for all admin API routes (auth + optional rate limiting + graceful session expiry)
+- Created src/services/admin/admin-order-service.ts — admin order operations: dashboard stats (8 categories with IST timezone), listOrdersByStatus (with items, customer profiles, search), acceptOrder (idempotent, race-condition guarded via status check in WHERE clause, status history logging)
+- Updated src/app/api/admin/dashboard/route.ts — now auth-protected with rate limiting, returns 8 real DB stats
+- Created src/app/api/admin/orders/list/route.ts — auth-protected, lists orders by status with items, customer info, branch info, search
+- Created src/app/api/admin/orders/accept/route.ts — auth-protected, rate-limited, validates UUID, idempotent accept (confirmed → accepted)
+- Rewrote src/app/admin/dashboard/page.tsx — 8 stat cards (Today, Pending, Ongoing, Completed, Accepted, Preparing, Ready for Pickup, Cancelled) + upcoming orders summary card
+- Created src/hooks/use-admin-dashboard.ts — custom hook with initial fetch + Supabase Realtime subscription for live updates
+- Rewrote src/app/admin/orders/new/page.tsx — full order cards with: order #, customer name, WhatsApp (tel: link), branch, pickup date/time, item list with emojis/variants/qty/price, price breakdown (subtotal, donations, reward redemption, total, points earned), payment status badge, Accept button (functional), Reject button (disabled, 'Coming Soon'), customer notes, search with debounce, realtime subscription, optimistic removal on accept
+- Added ~500 lines of CSS: order cards, order grid (1/2/3 col responsive), item rows, price breakdown, payment badges, action buttons, phone links, donation/reward/points rows, quick-info dashboard cards, refresh buttons, order count badges, responsive breakpoints (768px, 480px)
+- Added .admin-stat-icon.teal color for Ready for Pickup card
+- Updated admin store: removed dead code (otpDigits, store-level verifyOtp), added DashboardStats type, setDashboardStats action, session deduplication
+- Updated AdminShell: now single auth source, added brand-logo.png, responsive logo hiding
+- Updated AdminAuthGuard: thin wrapper, no checkSession call
+- Updated Admin login: added brand-logo.png
+
+Stage Summary:
+- Files created: 5 (auth-helpers.ts, admin-order-service.ts, use-admin-dashboard.ts, orders/list/route.ts, orders/accept/route.ts)
+- Files modified: 9 (admin-store.ts, AdminShell.tsx, AdminAuthGuard.tsx, admin login page.tsx, dashboard page.tsx, new orders page.tsx, dashboard API route.ts, globals.css)
+- Build passes cleanly with zero errors
+- All admin APIs now auth-protected and rate-limited
+- Session freeze permanently fixed via promise deduplication
+- Logo consistent across customer + admin
+- Real-time dashboard via Supabase Realtime postgres_changes
+- Accept order is idempotent, race-condition safe, server-validated

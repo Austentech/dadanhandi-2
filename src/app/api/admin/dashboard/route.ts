@@ -1,43 +1,33 @@
 /**
  * GET /api/admin/dashboard
- * Returns dashboard summary stats.
- * Reads from the orders table to show real counts.
+ * Returns live dashboard summary stats from the database.
+ * Protected: requires valid admin session.
+ * Rate limited: 60 requests per minute.
  */
 
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/client-admin'
+import { validateAdminRequest } from '@/lib/admin/auth-helpers'
+import { getDashboardStats } from '@/services/admin/admin-order-service'
 
-export async function GET() {
-  try {
-    const supabase = createAdminClient()
+export async function GET(request: Request) {
+  // Auth + rate limit
+  const auth = await validateAdminRequest(request, {
+    rateLimitType: 'admin_dashboard',
+    rateLimitConfig: { maxAttempts: 60, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
+  })
+  if (!auth.valid) return auth.errorResponse!
 
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
+  const result = await getDashboardStats()
 
-    const [todayRes, pendingRes, ongoingRes, completedRes] = await Promise.all([
-      supabase.from('orders').select('id', { count: 'exact', head: true })
-        .gte('created_at', todayStart.toISOString()),
-      supabase.from('orders').select('id', { count: 'exact', head: true })
-        .eq('order_status', 'confirmed'),
-      supabase.from('orders').select('id', { count: 'exact', head: true })
-        .in('order_status', ['confirmed', 'preparing', 'ready_for_pickup']),
-      supabase.from('orders').select('id', { count: 'exact', head: true })
-        .eq('order_status', 'completed'),
-    ])
-
-    return NextResponse.json({
-      success: true,
-      stats: {
-        todayOrders: todayRes.count || 0,
-        pendingOrders: pendingRes.count || 0,
-        ongoingOrders: ongoingRes.count || 0,
-        completedOrders: completedRes.count || 0,
-      },
-    })
-  } catch (err) {
-    console.error('[ADMIN API] dashboard error:', err)
+  if (!result.success) {
     return NextResponse.json(
-      { success: true, stats: { todayOrders: 0, pendingOrders: 0, ongoingOrders: 0, completedOrders: 0 } },
+      { success: false, message: 'Failed to load dashboard stats' },
+      { status: 500 }
     )
   }
+
+  return NextResponse.json({
+    success: true,
+    stats: result.stats,
+  })
 }

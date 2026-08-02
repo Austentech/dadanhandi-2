@@ -1,117 +1,149 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useAdminDashboard } from '@/hooks/use-admin-dashboard'
 import AdminShell from '@/components/admin/AdminShell'
-import { useAdminStore } from '@/store/admin-store'
-import { ShoppingCart, Clock, Truck, CheckCircle } from 'lucide-react'
+import {
+  ShoppingCart,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Truck,
+  ChefHat,
+  PackageCheck,
+  AlertCircle,
+} from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Stat Card Component (reusable)
+// ---------------------------------------------------------------------------
+function StatCard({
+  icon,
+  iconBg,
+  label,
+  value,
+  loading,
+}: {
+  icon: React.ReactNode
+   iconBg: string
+   label: string
+   value: number
+   loading: boolean
+}) {
+  return (
+    <div className="admin-stat-card">
+      <div className={`admin-stat-icon ${iconBg}`}>{icon}</div>
+      <div className="admin-stat-info">
+        <span className="admin-stat-label">{label}</span>
+        <span className="admin-stat-value">{loading ? '—' : value}</span>
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Dashboard Page
 // ---------------------------------------------------------------------------
-interface DashboardStats {
-  todayOrders: number
-  pendingOrders: number
-  ongoingOrders: number
-  completedOrders: number
-}
-
-const DEFAULT_STATS: DashboardStats = {
-  todayOrders: 0,
-  pendingOrders: 0,
-  ongoingOrders: 0,
-  completedOrders: 0,
-}
-
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>(DEFAULT_STATS)
-  const [loading, setLoading] = useState(true)
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/dashboard')
-      const data = await res.json()
-      if (data.success && data.stats) {
-        setStats(data.stats)
-      }
-    } catch (err) {
-      console.error('[Dashboard] Failed to fetch stats:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchStats()
-  }, [fetchStats])
+  const { stats, loading, error, refresh } = useAdminDashboard()
 
   return (
     <AdminShell>
-      <h1 className="admin-page-title">Dashboard</h1>
-      <p className="admin-page-subtitle">Overview of today&apos;s restaurant activity</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+        <h1 className="admin-page-title" style={{ marginBottom: 0 }}>Dashboard</h1>
+        {error && (
+          <button
+            onClick={refresh}
+            className="admin-refresh-btn"
+            aria-label="Retry loading dashboard"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+      <p className="admin-page-subtitle">Live overview of restaurant activity</p>
 
-      {/* Stat Cards */}
+      {/* Stat Cards — Row 1: Core metrics */}
       <div className="admin-stat-grid">
-        {/* Today's Orders */}
-        <div className="admin-stat-card">
-          <div className="admin-stat-icon blue">
-            <ShoppingCart size={22} />
-          </div>
-          <div className="admin-stat-info">
-            <span className="admin-stat-label">Today&apos;s Orders</span>
-            <span className="admin-stat-value">{loading ? '—' : stats.todayOrders}</span>
-            <span className="admin-stat-change neutral">from yesterday</span>
-          </div>
-        </div>
-
-        {/* Pending */}
-        <div className="admin-stat-card">
-          <div className="admin-stat-icon amber">
-            <Clock size={22} />
-          </div>
-          <div className="admin-stat-info">
-            <span className="admin-stat-label">Pending Orders</span>
-            <span className="admin-stat-value">{loading ? '—' : stats.pendingOrders}</span>
-            <span className="admin-stat-change neutral">awaiting confirmation</span>
-          </div>
-        </div>
-
-        {/* Ongoing */}
-        <div className="admin-stat-card">
-          <div className="admin-stat-icon green">
-            <Truck size={22} />
-          </div>
-          <div className="admin-stat-info">
-            <span className="admin-stat-label">Ongoing Orders</span>
-            <span className="admin-stat-value">{loading ? '—' : stats.ongoingOrders}</span>
-            <span className="admin-stat-change neutral">in progress</span>
-          </div>
-        </div>
-
-        {/* Completed */}
-        <div className="admin-stat-card">
-          <div className="admin-stat-icon purple">
-            <CheckCircle size={22} />
-          </div>
-          <div className="admin-stat-info">
-            <span className="admin-stat-label">Completed</span>
-            <span className="admin-stat-value">{loading ? '—' : stats.completedOrders}</span>
-            <span className="admin-stat-change neutral">today</span>
-          </div>
-        </div>
+        <StatCard
+          icon={<ShoppingCart size={22} />}
+          iconBg="blue"
+          label="Today's Orders"
+          value={stats.todayOrders}
+          loading={loading}
+        />
+        <StatCard
+          icon={<Clock size={22} />}
+          iconBg="amber"
+          label="Pending"
+          value={stats.pendingOrders}
+          loading={loading}
+        />
+        <StatCard
+          icon={<Truck size={22} />}
+          iconBg="green"
+          label="Ongoing"
+          value={stats.acceptedOrders + stats.preparingOrders + stats.readyOrders}
+          loading={loading}
+        />
+        <StatCard
+          icon={<CheckCircle size={22} />}
+          iconBg="purple"
+          label="Completed"
+          value={stats.completedOrders}
+          loading={loading}
+        />
       </div>
 
-      {/* Placeholder for future charts / recent orders */}
-      <div className="admin-card" style={{ padding: 40 }}>
-        <div className="admin-empty-state">
-          <div style={{ color: '#cbd5e1', marginBottom: 16 }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3v18h18" />
-              <path d="m19 9-5 5-4-4-3 3" />
-            </svg>
+      {/* Stat Cards — Row 2: Detailed breakdown */}
+      <div className="admin-stat-grid">
+        <StatCard
+          icon={<PackageCheck size={22} />}
+          iconBg="blue"
+          label="Accepted"
+          value={stats.acceptedOrders}
+          loading={loading}
+        />
+        <StatCard
+          icon={<ChefHat size={22} />}
+          iconBg="amber"
+          label="Preparing"
+          value={stats.preparingOrders}
+          loading={loading}
+        />
+        <StatCard
+          icon={<AlertCircle size={22} />}
+          iconBg="teal"
+          label="Ready for Pickup"
+          value={stats.readyOrders}
+          loading={loading}
+        />
+        <StatCard
+          icon={<XCircle size={22} />}
+          iconBg="red"
+          label="Cancelled"
+          value={stats.cancelledOrders}
+          loading={loading}
+        />
+      </div>
+
+      {/* Quick Info Card */}
+      <div className="admin-card" style={{ marginTop: 8 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 16,
+        }}>
+          <div className="admin-quick-info">
+            <span className="admin-quick-info-label">Upcoming Orders</span>
+            <span className="admin-quick-info-value">{loading ? '—' : stats.upcomingOrders}</span>
           </div>
-          <div className="admin-empty-state-title">Detailed analytics coming soon</div>
-          <div className="admin-empty-state-desc">
-            Charts, revenue breakdowns, and order trends will be available in a future update.
+          <div className="admin-quick-info">
+            <span className="admin-quick-info-label">Pending + Upcoming</span>
+            <span className="admin-quick-info-value">{loading ? '—' : stats.pendingOrders + stats.upcomingOrders}</span>
+          </div>
+          <div className="admin-quick-info">
+            <span className="admin-quick-info-label">Total Ongoing</span>
+            <span className="admin-quick-info-value">{loading ? '—' : stats.acceptedOrders + stats.preparingOrders + stats.readyOrders}</span>
           </div>
         </div>
       </div>

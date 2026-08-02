@@ -21,7 +21,7 @@ export type AdminOrderStatus =
   | 'cancelled'        // cancelled
   | 'failed'           // payment failed
 
-/** Valid status transitions (from → allowed to[]) */
+/** Valid status transitions (from -> allowed to[]) */
 const VALID_TRANSITIONS: Record<string, AdminOrderStatus[]> = {
   confirmed: ['accepted', 'cancelled'],
   accepted: ['preparing', 'cancelled'],
@@ -60,10 +60,11 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
 
     const [todayRes, confirmedRes, acceptedRes, preparingRes, readyRes, completedRes, cancelledRes] =
       await Promise.all([
-        // Today's orders (all statuses)
+        // Today's orders (all non-draft statuses)
         supabase.from('orders').select('id', { count: 'exact', head: true })
+          .neq('order_status', 'draft')
           .gte('created_at', todayStartUTC.toISOString()),
-        // Pending (confirmed = paid but not yet accepted by admin)
+        // Pending = confirmed (paid but not yet accepted by admin)
         supabase.from('orders').select('id', { count: 'exact', head: true })
           .eq('order_status', 'confirmed'),
         // Accepted
@@ -85,14 +86,15 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           .gte('created_at', todayStartUTC.toISOString()),
       ])
 
-    // Upcoming = orders with future pickup date (for the next 2 hours window)
-    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString()
+    // Upcoming = confirmed orders with pickup slot starting within 2 hours
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+    // Build today's date string for pickup_date comparison
+    const todayDateStr = todayStart.toISOString().split('T')[0]
     const { count: upcomingCount } = await supabase
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('order_status', 'confirmed')
-      .gte('pickup_slot_start', now.toISOString())
-      .lte('pickup_slot_start', twoHoursFromNow)
+      .eq('pickup_date', todayDateStr)
 
     return {
       success: true,
@@ -127,7 +129,62 @@ function emptyStats(): DashboardStats {
 }
 
 // ============================================================================
-// LIST ORDERS
+// RAW DATABASE ROW TYPES (snake_case from Supabase)
+// ============================================================================
+
+interface RawOrderRow {
+  id: string
+  order_number: string
+  user_id: string
+  branch_id: string
+  pickup_date: string
+  pickup_slot_start: string
+  pickup_slot_end: string
+  subtotal_paise: number
+  donation_plantation_paise: number
+  donation_hunger_paise: number
+  reward_points_redeemed: number
+  reward_discount_paise: number
+  final_amount_paise: number
+  reward_points_earned: number
+  payment_status: string
+  order_status: string
+  payment_method: string | null
+  razorpay_order_id: string | null
+  customer_notes: string | null
+  created_at: string
+  updated_at: string
+  order_items?: RawOrderItemRow[]
+  branchs?: { name: string; slug: string; city: string } | null
+}
+
+interface RawOrderItemRow {
+  id: string
+  order_id: string
+  line_key: string
+  item_id: string
+  variant_id: string
+  item_name: string
+  item_emoji: string
+  item_type: string
+  variant_label: string
+  weight_grams: number | null
+  piece_count: number | null
+  unit_price_paise: number
+  quantity: number
+  line_total_paise: number
+  created_at: string
+}
+
+interface RawProfileRow {
+  id: string
+  full_name: string | null
+  whatsapp_number: string | null
+  mobile_number: string | null
+}
+
+// ============================================================================
+// MAPPED (camelCase) TYPES — used by frontend
 // ============================================================================
 
 export interface AdminOrderItem {
@@ -146,6 +203,7 @@ export interface AdminOrderItem {
   finalAmountPaise: number
   rewardPointsEarned: number
   paymentStatus: string
+  paymentMethod: string | null
   orderStatus: string
   razorpayOrderId: string | null
   customerNotes: string | null
@@ -166,8 +224,8 @@ export interface AdminOrderItemDetail {
 }
 
 export interface AdminOrderWithItems extends AdminOrderItem {
- items: AdminOrderItemDetail[]
- branch?: {
+  items: AdminOrderItemDetail[]
+  branch?: {
     name: string
     slug: string
     city: string
@@ -186,8 +244,60 @@ export interface ListOrdersResult {
   error?: string
 }
 
+// ============================================================================
+// MAPPING HELPERS
+// ============================================================================
+
+/** Map a raw DB order row (snake_case) to camelCase AdminOrderItem */
+function mapOrderRow(raw: RawOrderRow): AdminOrderItem {
+  return {
+    id: raw.id,
+    orderNumber: raw.order_number,
+    userId: raw.user_id,
+    branchId: raw.branch_id,
+    pickupDate: raw.pickup_date,
+    pickupSlotStart: raw.pickup_slot_start,
+    pickupSlotEnd: raw.pickup_slot_end,
+    subtotalPaise: raw.subtotal_paise,
+    donationPlantationPaise: raw.donation_plantation_paise,
+    donationHungerPaise: raw.donation_hunger_paise,
+    rewardPointsRedeemed: raw.reward_points_redeemed,
+    rewardDiscountPaise: raw.reward_discount_paise,
+    finalAmountPaise: raw.final_amount_paise,
+    rewardPointsEarned: raw.reward_points_earned,
+    paymentStatus: raw.payment_status,
+    paymentMethod: raw.payment_method,
+    orderStatus: raw.order_status,
+    razorpayOrderId: raw.razorpay_order_id,
+    customerNotes: raw.customer_notes,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+  }
+}
+
+/** Map a raw DB order_item row (snake_case) to camelCase AdminOrderItemDetail */
+function mapOrderItemRow(raw: RawOrderItemRow): AdminOrderItemDetail {
+  return {
+    lineKey: raw.line_key,
+    itemName: raw.item_name,
+    itemEmoji: raw.item_emoji,
+    variantLabel: raw.variant_label,
+    weightGrams: raw.weight_grams,
+    pieceCount: raw.piece_count,
+    unitPricePaise: raw.unit_price_paise,
+    quantity: raw.quantity,
+    lineTotalPaise: raw.line_total_paise,
+  }
+}
+
+// ============================================================================
+// LIST ORDERS
+// ============================================================================
+
 /**
  * List orders with a given status, including items and customer info.
+ * For 'confirmed' status, also filters by payment_status='succeeded' to
+ * ensure only PAID orders appear in the New Orders list.
  */
 export async function listOrdersByStatus(
   status: AdminOrderStatus,
@@ -211,12 +321,18 @@ export async function listOrdersByStatus(
         branches (name, slug, city)
       `, { count: 'exact' })
       .eq('order_status', status)
+
+    // For 'confirmed' status: only show PAID orders
+    if (status === 'confirmed') {
+      query = query.eq('payment_status', 'succeeded')
+    }
+
+    query = query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
     // Optional: filter by branch
     if (options?.branchSlug) {
-      // Join through branches table slug
       query = query.eq('branch_id', options.branchSlug)
     }
 
@@ -232,14 +348,14 @@ export async function listOrdersByStatus(
     }
 
     // Fetch customer profiles for all orders
-    const userIds = [...new Set(orders.map((o: Record<string, unknown>) => o.user_id as string))]
+    const userIds = [...new Set(orders.map((o: RawOrderRow) => o.user_id))]
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, whatsapp_number, mobile_number')
       .in('id', userIds)
 
     const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
-    for (const p of (profiles || [])) {
+    for (const p of (profiles || []) as RawProfileRow[]) {
       profileMap.set(p.id, {
         name: p.full_name || 'Customer',
         whatsappNumber: p.whatsapp_number || null,
@@ -248,29 +364,29 @@ export async function listOrdersByStatus(
     }
 
     // Search filter (applied in-memory since Supabase free tier doesn't support full-text across joins)
-    let filteredOrders = orders
+    let filteredOrders = orders as RawOrderRow[]
     if (options?.search) {
       const q = options.search.toLowerCase()
-      filteredOrders = orders.filter((o: Record<string, unknown>) => {
-        const orderNum = (o.order_number as string || '').toLowerCase()
-        const profile = profileMap.get(o.user_id as string)
+      filteredOrders = filteredOrders.filter((o) => {
+        const orderNum = (o.order_number || '').toLowerCase()
+        const profile = profileMap.get(o.user_id)
         const customerName = (profile?.name || '').toLowerCase()
         return orderNum.includes(q) || customerName.includes(q)
       })
     }
 
-    // Map to typed response
-    const mapped: AdminOrderWithItems[] = filteredOrders.map((o: Record<string, unknown>) => {
-        const raw = o as unknown as AdminOrderItem & { order_items: unknown; branches: unknown }
-        const profile = profileMap.get(raw.userId)
-        const branch = raw.branchs as { name: string; slug: string; city: string } | null
-        return {
-          ...raw,
-          items: (raw.order_items || []) as AdminOrderItemDetail[],
-          branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
-          customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
-        }
-      })
+    // Map to typed response with proper snake_case -> camelCase conversion
+    const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
+      const profile = profileMap.get(o.user_id)
+      // Supabase returns the joined table as singular 'branchs' (from 'branches')
+      const branch = o.branchs as { name: string; slug: string; city: string } | null
+      return {
+        ...mapOrderRow(o),
+        items: (o.order_items || []).map(mapOrderItemRow),
+        branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
+        customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
+      }
+    })
 
     return {
       success: true,
@@ -296,7 +412,7 @@ export interface AcceptOrderResult {
 
 /**
  * Accept an order: transition from 'confirmed' to 'accepted'.
- * - Validates order exists and is still 'confirmed'
+ * - Validates order exists, is 'confirmed', and payment succeeded
  * - Prevents duplicate acceptance (idempotent by design)
  * - Records status change in order_status_history
  */
@@ -312,8 +428,9 @@ export async function acceptOrder(
       return { success: false, message: 'Invalid order ID' }
     }
 
-    // 2. Fetch the order with a row-level lock (SELECT FOR UPDATE equivalent via status check)
-    const { data: order, error: fetchErr } = await supabase
+    // 2. Fetch the order
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: order, error: fetchErr }: { data: RawOrderRow | null; error: any } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
@@ -323,46 +440,55 @@ export async function acceptOrder(
       return { success: false, message: 'Order not found' }
     }
 
-    // 3. Validate current status
+    // 3. Validate payment status — must be succeeded
+    if (order.payment_status !== 'succeeded') {
+      return { success: false, message: 'Cannot accept an unpaid order' }
+    }
+
+    // 4. Validate current status
     if (order.order_status !== 'confirmed') {
       if (order.order_status === 'accepted') {
-        // Already accepted — idempotent success
         return { success: true, message: 'Order already accepted' }
       }
       return { success: false, message: `Cannot accept order in '${order.order_status}' status` }
     }
 
-    // 4. Validate the transition is allowed
+    // 5. Validate the transition is allowed
     const allowedTransitions = VALID_TRANSITIONS[order.order_status] || []
     if (!allowedTransitions.includes('accepted')) {
       return { success: false, message: 'Invalid status transition' }
     }
 
-    // 5. Update order status
-    const { error: updateErr } = await supabase
+    // 6. Update order status (race condition guard: only update if still confirmed)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+    const { error: updateErr } = await sb
       .from('orders')
       .update({
         order_status: 'accepted',
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId)
-      .eq('order_status', 'confirmed') // Race condition guard: only update if still confirmed
+      .eq('order_status', 'confirmed')
 
     if (updateErr) {
       console.error('[ADMIN ORDER SERVICE] acceptOrder update error:', updateErr)
       return { success: false, message: 'Failed to update order. Please try again.' }
     }
 
-    // 6. Log status change in history
+    // 7. Log status change in history
+    //    Table schema: (order_id, status, note, created_at)
+    //    Unique constraint: (order_id, status) — one row per status per order
     try {
-      await supabase.from('order_status_history').insert({
+      const { error: histErr } = await sb.from('order_status_history').insert({
         order_id: orderId,
-        from_status: 'confirmed',
-        to_status: 'accepted',
-        changed_by: adminUserId,
-        changed_by_role: 'admin',
-        reason: 'Accepted by admin',
+        status: 'accepted',
+        note: 'Accepted by admin',
       })
+      // Ignore duplicate key errors (order already has 'accepted' status row)
+      if (histErr && !String(histErr.message || histErr).includes('duplicate')) {
+        console.error('[ADMIN ORDER SERVICE] Failed to log status history:', histErr)
+      }
     } catch (historyErr) {
       // Log but don't fail — the order status was already updated
       console.error('[ADMIN ORDER SERVICE] Failed to log status history:', historyErr)

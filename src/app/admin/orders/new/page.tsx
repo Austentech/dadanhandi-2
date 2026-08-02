@@ -27,31 +27,56 @@ function formatPaise(paise: number): string {
   return '₹' + (paise / 100).toFixed(0)
 }
 
-/** Format ISO time to local readable time */
-function formatTime(iso: string): string {
+/** Format a time value (ISO string, timestamptz, or HH:MM:SS) to readable time */
+function formatTime(value: string): string {
   try {
-    return new Date(iso).toLocaleTimeString('en-IN', {
+    // Handle bare time strings like "14:30:00" (Postgres TIME type)
+    if (/^\d{1,2}:\d{2}/.test(value) && !value.includes('T') && !value.includes('Z')) {
+      const [h, m] = value.split(':').map(Number)
+      const date = new Date()
+      date.setHours(h, m, 0, 0)
+      return date.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata',
+      })
+    }
+    // Handle ISO timestamptz strings
+    return new Date(value).toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
       timeZone: 'Asia/Kolkata',
     })
   } catch {
-    return iso
+    return value
   }
 }
 
-/** Format ISO date to readable date */
-function formatDate(iso: string): string {
+/** Format a date value (ISO string or YYYY-MM-DD) to readable date */
+function formatDate(value: string): string {
   try {
-    return new Date(iso).toLocaleDateString('en-IN', {
+    // Handle bare date strings like "2026-08-02" (Postgres DATE type)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [y, m, d] = value.split('-').map(Number)
+      const date = new Date(y, m - 1, d)
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata',
+      })
+    }
+    // Handle ISO timestamptz strings
+    return new Date(value).toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
       timeZone: 'Asia/Kolkata',
     })
   } catch {
-    return iso
+    return value
   }
 }
 
@@ -249,7 +274,7 @@ export default function NewOrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const { refresh: refreshDashboard } = useAdminDashboard()
 
   // Fetch orders
@@ -325,7 +350,7 @@ export default function NewOrdersPage() {
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value)
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (searchTimerRef.current !== undefined) clearTimeout(searchTimerRef.current)
     searchTimerRef.current = setTimeout(() => {
       fetchOrders(value)
     }, 400)
@@ -371,7 +396,7 @@ export default function NewOrdersPage() {
     <AdminShell>
       <h1 className="admin-page-title">New Orders</h1>
       <p className="admin-page-subtitle">
-        Orders awaiting confirmation and acceptance
+        Paid orders awaiting acceptance
         {orders.length > 0 && (
           <span className="admin-order-count-badge">{orders.length}</span>
         )}

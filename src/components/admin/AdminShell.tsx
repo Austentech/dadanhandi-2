@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAdminStore } from '@/store/admin-store'
+import Image from 'next/image'
 import {
   LayoutDashboard,
   User,
@@ -15,6 +16,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  ChefHat,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -40,7 +45,7 @@ const ORDER_ITEMS: NavItem[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// AdminShell component
+// AdminShell component — the SINGLE source of truth for admin auth checking
 // ---------------------------------------------------------------------------
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -58,7 +63,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     toggleSidebarCollapsed,
   } = useAdminStore()
 
-  // Check session on mount
+  // Single session check on mount — deduplicated by the store
   useEffect(() => {
     checkSession()
   }, [checkSession])
@@ -88,7 +93,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const navigateTo = useCallback(
     (href: string) => {
       router.push(href)
-      setSidebarOpen(false) // close mobile sidebar on nav
+      setSidebarOpen(false)
     },
     [router, setSidebarOpen],
   )
@@ -120,20 +125,28 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }
 
   if (!isAuthenticated) {
-    return null // Will redirect via useEffect
+    return null
   }
 
   return (
     <div className="admin-shell">
       {/* ---------- Sidebar Column ---------- */}
-      <div
-        className={`admin-shell-sidebar-col ${sidebarOpen ? 'mobile-open' : ''}`}
-      >
+      <div className={`admin-shell-sidebar-col ${sidebarOpen ? 'mobile-open' : ''}`}>
         <aside className={`admin-shell-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${sidebarOpen ? 'mobile-open' : ''}`}>
-          {/* Brand */}
+          {/* Brand — uses the same logo as the customer site */}
           <div className="admin-sidebar-brand">
-            <div className="admin-sidebar-brand-title">DH Admin</div>
-            <div className="admin-sidebar-brand-sub">Dadan Handi</div>
+            <Image
+              src="/images/brand-logo.png"
+              alt="Dadan Handi Logo"
+              width={40}
+              height={40}
+              className="admin-sidebar-logo-img"
+              priority
+            />
+            <div className="admin-sidebar-brand-text">
+              <div className="admin-sidebar-brand-title">DH Admin</div>
+              <div className="admin-sidebar-brand-sub">Dadan Handi</div>
+            </div>
           </div>
 
           {/* Main Nav */}
@@ -195,7 +208,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         {/* Header */}
         <header className="admin-header">
           <div className="admin-header-left">
-            {/* Collapse toggle — visible on tablet+ */}
             <button
               className="admin-header-toggle"
               onClick={toggleSidebarCollapsed}
@@ -204,7 +216,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               {sidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
             </button>
 
-            {/* Mobile hamburger */}
             <button
               className="admin-header-mobile-menu"
               onClick={() => setSidebarOpen(true)}
@@ -226,7 +237,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               </div>
             )}
 
-            {/* Mobile avatar only */}
             {adminUser && (
               <button
                 className="admin-header-mobile-menu"

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminStore } from '@/store/admin-store'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
+import Image from 'next/image'
 import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 const OTP_LENGTH = ADMIN_CONFIG.OTP_LENGTH
@@ -34,16 +35,15 @@ export default function AdminLoginPage() {
     isAuthenticated,
     isLoadingAuth,
     setOtpEmail,
-    verifyOtp: storeVerifyOtp,
     checkSession,
   } = useAdminStore()
 
-  // Local OTP value — single string, one real input
+  // Local OTP value
   const [otpValue, setOtpValue] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
   const [emailClientError, setEmailClientError] = useState<string | null>(null)
 
-  // Check session on mount
+  // Single session check — deduplicated by store. If already authed, redirect.
   useEffect(() => { checkSession() }, [checkSession])
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function AdminLoginPage() {
   const handleSendOtp = useCallback(async () => {
     const trimmed = otpEmail.trim()
     if (!trimmed) { setEmailClientError('Please enter your email address.'); return }
-    if (/[;\'"\\<>]/.test(trimmed)) { setEmailClientError('Invalid characters in email.'); return }
+    if (/[;'"\\<>]/.test(trimmed)) { setEmailClientError('Invalid characters in email.'); return }
     if (!isValidEmail(trimmed)) { setEmailClientError('Please enter a valid email address.'); return }
     setEmailClientError(null)
     const email = trimmed.toLowerCase()
@@ -174,8 +174,16 @@ export default function AdminLoginPage() {
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
+        {/* Brand logo — same as customer-facing site */}
         <div className="admin-login-logo">
-          <ShieldCheck size={32} color="#3b82f6" style={{ marginBottom: 8 }} />
+          <Image
+            src="/images/brand-logo.png"
+            alt="Dadan Handi Logo"
+            width={52}
+            height={52}
+            className="admin-login-logo-img"
+            priority
+          />
           <div className="admin-login-logo-title">DH Admin</div>
           <div className="admin-login-logo-sub">Dadan Handi Management Portal</div>
         </div>
@@ -192,7 +200,6 @@ export default function AdminLoginPage() {
               Enter the {OTP_LENGTH}-character code sent to <strong>{otpEmail}</strong>
             </div>
 
-            {/* Visual OTP boxes — clicking focuses the hidden input */}
             <div
               className="admin-otp-container"
               onClick={() => hiddenInputRef.current?.focus()}
@@ -206,7 +213,6 @@ export default function AdminLoginPage() {
                 </div>
               ))}
 
-              {/* Single real input — hidden but focusable */}
               <input
                 ref={hiddenInputRef}
                 type="text"

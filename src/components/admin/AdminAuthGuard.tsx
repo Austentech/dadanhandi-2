@@ -1,42 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAdminStore } from '@/store/admin-store'
-
 /**
- * AdminAuthGuard — wraps admin pages to verify auth before rendering.
- * Shows a full-page loading spinner while checking the session.
- * Redirects to /admin/login if not authenticated.
+ * AdminAuthGuard — thin wrapper that delegates to AdminShell's auth.
+ * AdminShell already calls checkSession() and redirects if unauthenticated,
+ * so this component is intentionally minimal. It exists as a named export
+ * for layout consistency but does NOT call checkSession() itself (which
+ * would cause duplicate session requests and session freeze).
  */
 export default function AdminAuthGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { isAuthenticated, isLoadingAuth, checkSession } = useAdminStore()
-
-  useEffect(() => {
-    checkSession()
-  }, [checkSession])
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      router.replace('/admin/login')
-    }
-  }, [isLoadingAuth, isAuthenticated, router])
-
-  // Still checking session
-  if (isLoadingAuth) {
-    return (
-      <div className="admin-auth-loading">
-        <div className="admin-auth-spinner" />
-        <span className="admin-auth-loading-text">Verifying session...</span>
-      </div>
-    )
-  }
-
-  // Not authenticated — will redirect via useEffect
-  if (!isAuthenticated) {
-    return null
-  }
-
   return <>{children}</>
 }

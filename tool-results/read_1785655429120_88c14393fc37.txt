@@ -1,0 +1,2002 @@
+  2030→
+  2031→.auth-modal-header {
+  2032→  text-align: center;
+  2033→  margin-bottom: 28px;
+  2034→}
+  2035→
+  2036→.auth-modal-logo {
+  2037→  margin-bottom: 16px;
+  2038→}
+  2039→
+  2040→.auth-modal-title {
+  2041→  font-family: var(--font-playfair), serif;
+  2042→  font-size: 1.6rem;
+  2043→  font-weight: 800;
+  2044→  color: var(--dark-red);
+  2045→  margin-bottom: 6px;
+  2046→}
+  2047→
+  2048→.auth-modal-subtitle {
+  2049→  color: var(--text-muted);
+  2050→  font-size: 0.88rem;
+  2051→}
+  2052→
+  2053→/* ---- AUTH FORM ELEMENTS ---- */
+  2054→.auth-field {
+  2055→  margin-bottom: 18px;
+  2056→}
+  2057→
+  2058→.auth-field-row {
+  2059→  display: grid;
+  2060→  grid-template-columns: 1fr 1fr;
+  2061→  gap: 14px;
+  2062→  margin-bottom: 18px;
+  2063→}
+  2064→
+  2065→.auth-label {
+  2066→  display: block;
+  2067→  font-size: 0.82rem;
+  2068→  font-weight: 700;
+  2069→  color: var(--text-dark);
+  2070→  margin-bottom: 6px;
+  2071→  font-family: var(--font-nunito), sans-serif;
+  2072→}
+  2073→
+  2074→.auth-input {
+  2075→  width: 100%;
+  2076→  padding: 11px 14px;
+  2077→  border: 1.5px solid var(--border-color);
+  2078→  border-radius: 10px;
+  2079→  font-size: 0.92rem;
+  2080→  font-family: var(--font-nunito), sans-serif;
+  2081→  color: var(--text-dark);
+  2082→  background: var(--card-bg);
+  2083→  transition: all 0.2s;
+  2084→  outline: none;
+  2085→}
+  2086→.auth-input:focus {
+  2087→  border-color: var(--dark-red);
+  2088→  box-shadow: 0 0 0 3px rgba(122, 12, 12, 0.1);
+  2089→}
+  2090→.auth-input::placeholder { color: var(--text-light); }
+  2091→
+  2092→.auth-error {
+  2093→  color: #dc2626;
+  2094→  font-size: 0.78rem;
+  2095→  margin-top: 4px;
+  2096→  font-weight: 600;
+  2097→}
+  2098→
+  2099→.auth-card {
+  2100→  background: var(--card-bg);
+  2101→  border: 1px solid var(--border-color);
+  2102→  border-radius: 14px;
+  2103→  padding: 28px;
+  2104→  box-shadow: 0 2px 12px rgba(122, 12, 12, 0.06);
+  2105→}
+  2106→
+  2107→/* ---- AUTH BUTTONS ---- */
+  2108→.auth-btn-primary {
+  2109→  width: 100%;
+  2110→  padding: 12px 20px;
+  2111→  background: var(--dark-red);
+  2112→  color: #fff;
+  2113→  border: none;
+  2114→  border-radius: 10px;
+  2115→  font-size: 0.95rem;
+  2116→  font-weight: 700;
+  2117→  font-family: var(--font-nunito), sans-serif;
+  2118→  cursor: pointer;
+  2119→  transition: all 0.2s;
+  2120→  display: flex;
+  2121→  align-items: center;
+  2122→  justify-content: center;
+  2123→  gap: 8px;
+  2124→  min-height: 46px;
+  2125→}
+  2126→.auth-btn-primary:hover:not(:disabled) { background: #5a0808; transform: translateY(-1px); }
+  2127→.auth-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  2128→
+  2129→.auth-btn-google {
+  2130→  width: 100%;
+  2131→  padding: 12px 20px;
+  2132→  background: #fff;
+  2133→  color: var(--text-dark);
+  2134→  border: 1.5px solid var(--border-color);
+  2135→  border-radius: 10px;
+  2136→  font-size: 0.92rem;
+  2137→  font-weight: 600;
+  2138→  font-family: var(--font-nunito), sans-serif;
+  2139→  cursor: pointer;
+  2140→  transition: all 0.2s;
+  2141→  display: flex;
+  2142→  align-items: center;
+  2143→  justify-content: center;
+  2144→  min-height: 46px;
+  2145→}
+  2146→.auth-btn-google:hover { border-color: var(--dark-red); background: rgba(122, 12, 12, 0.02); }
+  2147→
+  2148→.auth-divider {
+  2149→  display: flex;
+  2150→  align-items: center;
+  2151→  gap: 14px;
+  2152→  margin: 20px 0;
+  2153→}
+  2154→.auth-divider::before,
+  2155→.auth-divider::after {
+  2156→  content: '';
+  2157→  flex: 1;
+  2158→  height: 1px;
+  2159→  background: var(--border-color);
+  2160→}
+  2161→.auth-divider span {
+  2162→  font-size: 0.82rem;
+  2163→  color: var(--text-light);
+  2164→  font-weight: 600;
+  2165→}
+  2166→
+  2167→.auth-switch-text {
+  2168→  text-align: center;
+  2169→  margin-top: 20px;
+  2170→  font-size: 0.88rem;
+  2171→  color: var(--text-muted);
+  2172→}
+  2173→
+  2174→.auth-link {
+  2175→  background: none;
+  2176→  border: none;
+  2177→  color: var(--dark-red);
+  2178→  font-weight: 700;
+  2179→  font-size: 0.88rem;
+  2180→  cursor: pointer;
+  2181→  text-decoration: none;
+  2182→  padding: 0;
+  2183→  font-family: var(--font-nunito), sans-serif;
+  2184→}
+  2185→.auth-link:hover { text-decoration: underline; }
+  2186→
+  2187→/* ---- AUTH MESSAGES ---- */
+  2188→.auth-message {
+  2189→  padding: 12px 16px;
+  2190→  border-radius: 10px;
+  2191→  font-size: 0.85rem;
+  2192→  font-weight: 600;
+  2193→  margin-bottom: 18px;
+  2194→}
+  2195→.auth-message-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  2196→.auth-message-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  2197→
+  2198→/* ---- OTP INPUT ---- */
+  2199→.otp-input-container {
+  2200→  display: flex;
+  2201→  gap: 10px;
+  2202→  justify-content: center;
+  2203→}
+  2204→.otp-input-container.otp-input-error { }
+  2205→
+  2206→.otp-digit {
+  2207→  width: 48px;
+  2208→  height: 56px;
+  2209→  text-align: center;
+  2210→  font-size: 1.4rem;
+  2211→  font-weight: 800;
+  2212→  font-family: var(--font-playfair), serif;
+  2213→  border: 2px solid var(--border-color);
+  2214→  border-radius: 12px;
+  2215→  background: var(--card-bg);
+  2216→  color: var(--text-dark);
+  2217→  outline: none;
+  2218→  transition: all 0.2s;
+  2219→  caret-color: var(--dark-red);
+  2220→}
+  2221→.otp-digit:focus,
+  2222→.otp-digit-focused {
+  2223→  border-color: var(--dark-red);
+  2224→  box-shadow: 0 0 0 3px rgba(122, 12, 12, 0.12);
+  2225→}
+  2226→.otp-digit-filled {
+  2227→  border-color: var(--dark-red);
+  2228→  background: rgba(122, 12, 12, 0.03);
+  2229→}
+  2230→.otp-digit-error {
+  2231→  border-color: #dc2626;
+  2232→  animation: otp-shake 0.4s ease;
+  2233→}
+  2234→
+  2235→@keyframes otp-shake {
+  2236→  0%, 100% { transform: translateX(0); }
+  2237→  20% { transform: translateX(-6px); }
+  2238→  40% { transform: translateX(6px); }
+  2239→  60% { transform: translateX(-4px); }
+  2240→  80% { transform: translateX(4px); }
+  2241→}
+  2242→
+  2243→.auth-otp-section {
+  2244→  display: flex;
+  2245→  flex-direction: column;
+  2246→  align-items: center;
+  2247→}
+  2248→
+  2249→.auth-resend-section {
+  2250→  margin-top: 20px;
+  2251→  text-align: center;
+  2252→}
+  2253→
+  2254→.auth-resend-text {
+  2255→  color: var(--text-muted);
+  2256→  font-size: 0.85rem;
+  2257→}
+  2258→
+  2259→.auth-countdown {
+  2260→  color: var(--dark-red);
+  2261→  font-weight: 700;
+  2262→}
+  2263→
+  2264→/* ---- AUTH SPINNER ---- */
+  2265→.auth-spinner {
+  2266→  display: inline-block;
+  2267→  width: 18px;
+  2268→  height: 18px;
+  2269→  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  2270→  border-top-color: #fff;
+  2271→  border-radius: 50%;
+  2272→  animation: auth-spin 0.6s linear infinite;
+  2273→}
+  2274→
+  2275→@keyframes auth-spin {
+  2276→  to { transform: rotate(360deg); }
+  2277→}
+  2278→
+  2279→/* ---- NAV AUTH BUTTONS ---- */
+  2280→.nav-login-btn {
+  2281→  background: var(--dark-red);
+  2282→  color: #fff;
+  2283→  border: none;
+  2284→  border-radius: 8px;
+  2285→  padding: 7px 16px;
+  2286→  font-size: 0.85rem;
+  2287→  font-weight: 700;
+  2288→  font-family: var(--font-nunito), sans-serif;
+  2289→  cursor: pointer;
+  2290→  transition: all 0.2s;
+  2291→  display: flex;
+  2292→  align-items: center;
+  2293→  white-space: nowrap;
+  2294→}
+  2295→.nav-login-btn:hover { background: #5a0808; transform: translateY(-1px); }
+  2296→
+  2297→.nav-user-btn {
+  2298→  background: rgba(122, 12, 12, 0.06);
+  2299→  border: 1.5px solid rgba(122, 12, 12, 0.15);
+  2300→  border-radius: 8px;
+  2301→  padding: 7px 14px;
+  2302→  font-size: 0.85rem;
+  2303→  font-weight: 700;
+  2304→  font-family: var(--font-nunito), sans-serif;
+  2305→  color: var(--dark-red);
+  2306→  cursor: pointer;
+  2307→  transition: all 0.2s;
+  2308→  display: flex;
+  2309→  align-items: center;
+  2310→  gap: 8px;
+  2311→  white-space: nowrap;
+  2312→}
+  2313→.nav-user-btn:hover { background: rgba(122, 12, 12, 0.1); border-color: var(--dark-red); }
+  2314→
+  2315→.nav-user-icon {
+  2316→  width: 28px;
+  2317→  height: 28px;
+  2318→  border-radius: 50%;
+  2319→  background: var(--dark-red);
+  2320→  color: #fff;
+  2321→  display: flex;
+  2322→  align-items: center;
+  2323→  justify-content: center;
+  2324→  font-size: 0.75rem;
+  2325→  flex-shrink: 0;
+  2326→}
+  2327→
+  2328→.nav-user-name {
+  2329→  color: var(--dark-red);
+  2330→}
+  2331→
+  2332→/* ---- USER DRAWER ---- */
+  2333→.user-drawer-overlay {
+  2334→  position: fixed;
+  2335→  inset: 0;
+  2336→  background: rgba(44, 16, 8, 0.5);
+  2337→  z-index: 9998;
+  2338→  animation: auth-fade-in 0.2s ease;
+  2339→}
+  2340→
+  2341→.user-drawer {
+  2342→  position: fixed;
+  2343→  top: 0;
+  2344→  right: 0;
+  2345→  width: 340px;
+  2346→  max-width: 85vw;
+  2347→  height: 100vh;
+  2348→  background: var(--card-bg);
+  2349→  box-shadow: -8px 0 40px rgba(44, 16, 8, 0.15);
+  2350→  z-index: 9999;
+  2351→  display: flex;
+  2352→  flex-direction: column;
+  2353→  animation: drawer-slide-in 0.3s ease;
+  2354→}
+  2355→
+  2356→@keyframes drawer-slide-in {
+  2357→  from { transform: translateX(100%); }
+  2358→  to { transform: translateX(0); }
+  2359→}
+  2360→
+  2361→.user-drawer-close {
+  2362→  position: absolute;
+  2363→  top: 16px;
+  2364→  right: 16px;
+  2365→  background: none;
+  2366→  border: none;
+  2367→  font-size: 1.1rem;
+  2368→  color: var(--text-muted);
+  2369→  cursor: pointer;
+  2370→  width: 32px;
+  2371→  height: 32px;
+  2372→  display: flex;
+  2373→  align-items: center;
+  2374→  justify-content: center;
+  2375→  border-radius: 8px;
+  2376→  transition: all 0.2s;
+  2377→}
+  2378→.user-drawer-close:hover { background: rgba(122,12,12,0.06); color: var(--dark-red); }
+  2379→
+  2380→.user-drawer-header {
+  2381→  padding: 32px 24px 24px;
+  2382→  background: linear-gradient(160deg, #7A0C0C 0%, #a01a1a 100%);
+  2383→  color: #fff;
+  2384→  text-align: center;
+  2385→  position: relative;
+  2386→}
+  2387→
+  2388→.user-drawer-avatar {
+  2389→  margin-bottom: 12px;
+  2390→}
+  2391→.user-drawer-avatar img {
+  2392→  width: 64px;
+  2393→  height: 64px;
+  2394→  border-radius: 50%;
+  2395→  border: 3px solid rgba(255, 255, 255, 0.3);
+  2396→  object-fit: cover;
+  2397→}
+  2398→
+  2399→.user-drawer-avatar-fallback {
+  2400→  width: 64px;
+  2401→  height: 64px;
+  2402→  border-radius: 50%;
+  2403→  border: 3px solid rgba(255, 255, 255, 0.3);
+  2404→  background: rgba(255, 255, 255, 0.15);
+  2405→  display: flex;
+  2406→  align-items: center;
+  2407→  justify-content: center;
+  2408→  font-size: 1.5rem;
+  2409→  font-weight: 800;
+  2410→  font-family: var(--font-playfair), serif;
+  2411→  margin: 0 auto;
+  2412→}
+  2413→
+  2414→.user-drawer-name {
+  2415→  font-family: var(--font-playfair), serif;
+  2416→  font-size: 1.2rem;
+  2417→  font-weight: 700;
+  2418→  margin-bottom: 4px;
+  2419→}
+  2420→
+  2421→.user-drawer-email {
+  2422→  font-size: 0.8rem;
+  2423→  opacity: 0.8;
+  2424→}
+  2425→
+  2426→.user-drawer-nav {
+  2427→  flex: 1;
+  2428→  padding: 16px 12px;
+  2429→  overflow-y: auto;
+  2430→}
+  2431→
+  2432→.user-drawer-item {
+  2433→  display: flex;
+  2434→  align-items: center;
+  2435→  gap: 14px;
+  2436→  padding: 14px 16px;
+  2437→  color: var(--text-dark);
+  2438→  text-decoration: none;
+  2439→  border-radius: 10px;
+  2440→  transition: all 0.2s;
+  2441→  font-weight: 600;
+  2442→  font-size: 0.92rem;
+  2443→}
+  2444→.user-drawer-item:hover {
+  2445→  background: rgba(122, 12, 12, 0.05);
+  2446→  color: var(--dark-red);
+  2447→}
+  2448→.user-drawer-item i:first-child {
+  2449→  width: 20px;
+  2450→  text-align: center;
+  2451→  color: var(--clay-orange);
+  2452→}
+  2453→
+  2454→.user-drawer-arrow {
+  2455→  margin-left: auto;
+  2456→  font-size: 0.75rem;
+  2457→  color: var(--text-light) !important;
+  2458→  opacity: 0.5;
+  2459→}
+  2460→
+  2461→.user-drawer-footer {
+  2462→  padding: 16px 12px;
+  2463→  border-top: 1px solid var(--border-light);
+  2464→}
+  2465→
+  2466→.user-drawer-logout {
+  2467→  width: 100%;
+  2468→  padding: 12px 16px;
+  2469→  background: none;
+  2470→  border: 1.5px solid #dc2626;
+  2471→  border-radius: 10px;
+  2472→  color: #dc2626;
+  2473→  font-size: 0.92rem;
+  2474→  font-weight: 700;
+  2475→  font-family: var(--font-nunito), sans-serif;
+  2476→  cursor: pointer;
+  2477→  transition: all 0.2s;
+  2478→  display: flex;
+  2479→  align-items: center;
+  2480→  justify-content: center;
+  2481→  gap: 10px;
+  2482→}
+  2483→.user-drawer-logout:hover {
+  2484→  background: #fef2f2;
+  2485→}
+  2486→
+  2487→/* ---- AUTH REGISTER FORM ---- */
+  2488→.auth-register-form {
+  2489→  max-height: 55vh;
+  2490→  overflow-y: auto;
+  2491→  padding-right: 4px;
+  2492→}
+  2493→.auth-register-form::-webkit-scrollbar { width: 4px; }
+  2494→.auth-register-form::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+  2495→
+  2496→/* ---- RESPONSIVE: AUTH ---- */
+  2497→@media (max-width: 480px) {
+  2498→  .auth-modal {
+  2499→    padding: 28px 20px;
+  2500→    margin: 8px;
+  2501→  }
+  2502→  .auth-modal-title { font-size: 1.3rem; }
+  2503→  .otp-digit { width: 42px; height: 48px; font-size: 1.2rem; }
+  2504→  .otp-input-container { gap: 6px; }
+  2505→  .auth-field-row { grid-template-columns: 1fr; gap: 14px; }
+  2506→  .user-drawer { width: 100%; max-width: 100%; }
+  2507→}
+  2508→
+  2509→/* ---- MOBILE LOGOUT BUTTON (in nav panel) ---- */
+  2510→.mobile-logout-btn {
+  2511→  width: 100%;
+  2512→  padding: 10px 16px;
+  2513→  background: none;
+  2514→  border: 1.5px solid #dc2626;
+  2515→  border-radius: 8px;
+  2516→  color: #dc2626;
+  2517→  font-size: 0.88rem;
+  2518→  font-weight: 700;
+  2519→  font-family: var(--font-nunito), sans-serif;
+  2520→  cursor: pointer;
+  2521→  transition: all 0.2s;
+  2522→  display: flex;
+  2523→  align-items: center;
+  2524→  justify-content: center;
+  2525→  gap: 8px;
+  2526→}
+  2527→.mobile-logout-btn:hover {
+  2528→  background: #fef2f2;
+  2529→}
+  2530→
+  2531→/* ---- RESPONSIVE PROFILE GRID ---- */
+  2532→.profile-grid {
+  2533→  display: grid;
+  2534→  grid-template-columns: 1fr 1fr;
+  2535→  gap: 16px;
+  2536→}
+  2537→
+  2538→.auth-card-responsive {
+  2539→  overflow: hidden;
+  2540→}
+  2541→
+  2542→@media (max-width: 575px) {
+  2543→  .profile-grid {
+  2544→    grid-template-columns: 1fr;
+  2545→    gap: 14px;
+  2546→  }
+  2547→  .auth-card-responsive {
+  2548→    padding: 20px 16px;
+  2549→  }
+  2550→}
+  2551→
+  2552→/* ---- GLOBAL ANTI-OVERFLOW ---- */
+  2553→.auth-card,
+  2554→.page-hero .container-custom,
+  2555→.account-section .container-custom {
+  2556→  overflow-wrap: break-word;
+  2557→  word-break: break-word;
+  2558→  overflow-x: hidden;
+  2559→}
+  2560→
+  2561→a, p, span, div {
+  2562→  overflow-wrap: break-word;
+  2563→  word-break: break-word;
+  2564→}
+  2565→
+  2566→/* =============================================================
+  2567→   MODULE 2: MENU + CART + PRICING ENGINE STYLES
+  2568→   ============================================================= */
+  2569→
+  2570→/* ---- MENU HERO NOTICE ---- */
+  2571→.menu-hero-notice {
+  2572→  display: inline-flex;
+  2573→  align-items: center;
+  2574→  gap: 8px;
+  2575→  margin-top: 14px;
+  2576→  background: rgba(244, 196, 48, 0.15);
+  2577→  border: 1px solid rgba(244, 196, 48, 0.4);
+  2578→  border-radius: 20px;
+  2579→  padding: 6px 14px;
+  2580→  font-size: 0.78rem;
+  2581→  font-weight: 700;
+  2582→  color: var(--mustard-bright);
+  2583→  flex-wrap: wrap;
+  2584→}
+  2585→
+  2586→.menu-hero-notice i { color: var(--mustard-bright); }
+  2587→
+  2588→/* ---- MENU ITEM CARD V2 (improved layout) ---- */
+  2589→.menu-item-card-v2 {
+  2590→  align-items: flex-start;
+  2591→  flex-wrap: wrap;
+  2592→}
+  2593→
+  2594→.menu-item-card-v2 .menu-item-body {
+  2595→  flex: 1 1 200px;
+  2596→  min-width: 0;
+  2597→}
+  2598→
+  2599→.menu-item-card-v2 .menu-item-right-v2 {
+  2600→  display: flex;
+  2601→  flex-direction: column;
+  2602→  align-items: flex-end;
+  2603→  gap: 10px;
+  2604→  flex-shrink: 0;
+  2605→}
+  2606→
+  2607→.menu-item-price-block {
+  2608→  text-align: right;
+  2609→  display: flex;
+  2610→  flex-direction: column;
+  2611→  gap: 2px;
+  2612→}
+  2613→
+  2614→/* ---- VARIANT SELECTOR ---- */
+  2615→.menu-item-variant-row {
+  2616→  margin-top: 10px;
+  2617→  display: flex;
+  2618→  align-items: center;
+  2619→  gap: 8px;
+  2620→  flex-wrap: wrap;
+  2621→}
+  2622→
+  2623→.menu-item-variant-label {
+  2624→  font-size: 0.75rem;
+  2625→  font-weight: 700;
+  2626→  color: var(--text-muted);
+  2627→  white-space: nowrap;
+  2628→}
+  2629→
+  2630→.menu-item-variant-select {
+  2631→  flex: 1 1 140px;
+  2632→  max-width: 220px;
+  2633→  padding: 6px 28px 6px 10px;
+  2634→  border: 1.5px solid var(--border-color);
+  2635→  border-radius: 8px;
+  2636→  background: var(--card-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237A5030' d='M6 8L0 0h12z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  2637→  background-size: 10px;
+  2638→  -webkit-appearance: none;
+  2639→  -moz-appearance: none;
+  2640→  appearance: none;
+  2641→  font-family: var(--font-nunito), sans-serif;
+  2642→  font-size: 0.82rem;
+  2643→  font-weight: 600;
+  2644→  color: var(--text-dark);
+  2645→  cursor: pointer;
+  2646→  transition: all 0.2s;
+  2647→}
+  2648→
+  2649→.menu-item-variant-select:focus {
+  2650→  border-color: var(--dark-red);
+  2651→  box-shadow: 0 0 0 3px rgba(122, 12, 12, 0.1);
+  2652→  outline: none;
+  2653→}
+  2654→
+  2655→.menu-item-variant-select:hover {
+  2656→  border-color: var(--clay-orange);
+  2657→}
+  2658→
+  2659→/* ---- FLASH MESSAGE (success/error on add to plate) ---- */
+  2660→.menu-item-flash {
+  2661→  margin-top: 8px;
+  2662→  padding: 6px 10px;
+  2663→  border-radius: 6px;
+  2664→  font-size: 0.78rem;
+  2665→  font-weight: 700;
+  2666→  animation: flash-in 0.2s ease;
+  2667→}
+  2668→
+  2669→@keyframes flash-in {
+  2670→  from { opacity: 0; transform: translateY(-4px); }
+  2671→  to { opacity: 1; transform: translateY(0); }
+  2672→}
+  2673→
+  2674→.menu-item-flash-success {
+  2675→  background: #ecfdf5;
+  2676→  color: #065f46;
+  2677→  border: 1px solid #a7f3d0;
+  2678→}
+  2679→
+  2680→.menu-item-flash-error {
+  2681→  background: #fef2f2;
+  2682→  color: #991b1b;
+  2683→  border: 1px solid #fecaca;
+  2684→}
+  2685→
+  2686→/* ---- ADD TO PLATE BUTTON ---- */
+  2687→.btn-add-to-plate {
+  2688→  background: linear-gradient(135deg, var(--dark-red), #a01818);
+  2689→  color: #fff;
+  2690→  border: none;
+  2691→  padding: 8px 16px;
+  2692→  font-size: 0.78rem;
+  2693→  font-weight: 700;
+  2694→  border-radius: 20px;
+  2695→  cursor: pointer;
+  2696→  display: inline-flex;
+  2697→  align-items: center;
+  2698→  gap: 6px;
+  2699→  transition: all 0.3s;
+  2700→  white-space: nowrap;
+  2701→  letter-spacing: 0.3px;
+  2702→  font-family: var(--font-nunito), sans-serif;
+  2703→  min-height: 36px;
+  2704→}
+  2705→
+  2706→.btn-add-to-plate:hover:not(:disabled) {
+  2707→  background: linear-gradient(135deg, #a01818, var(--dark-red));
+  2708→  transform: translateY(-1px);
+  2709→  box-shadow: 0 4px 14px rgba(122, 12, 12, 0.35);
+  2710→}
+  2711→
+  2712→.btn-add-to-plate:disabled {
+  2713→  opacity: 0.6;
+  2714→  cursor: not-allowed;
+  2715→}
+  2716→
+  2717→/* =============================================================
+  2718→   TOAST ALERT CENTER (global popup notifications)
+  2719→   -------------------------------------------------------------
+  2720→   Renders centered, auto-dismissing alert popups.
+  2721→   Used for: Add-to-Plate errors, cart errors, login prompts, etc.
+  2722→   Auto-closes after 5s; manual X close; pauses on hover.
+  2723→   ============================================================= */
+  2724→.toast-center-overlay {
+  2725→  position: fixed;
+  2726→  /* Center horizontally; position vertically a bit above center
+  2727→     so it's in the natural eye-line on most devices. */
+  2728→  top: 50%;
+  2729→  left: 50%;
+  2730→  transform: translate(-50%, -50%);
+  2731→  z-index: 10500; /* Above cart drawer (10001), below menu-notice (10000) conflict avoided */
+  2732→  pointer-events: none; /* let clicks pass through to underlying UI except on the toast itself */
+  2733→  width: 100%;
+  2734→  max-width: 100vw;
+  2735→  display: flex;
+  2736→  justify-content: center;
+  2737→  /* Do NOT set height here — let it be auto so it doesn't block clicks */
+  2738→}
+  2739→
+  2740→.toast-center-stack {
+  2741→  display: flex;
+  2742→  flex-direction: column;
+  2743→  align-items: center;
+  2744→  gap: 10px;
+  2745→  width: 100%;
+  2746→  max-width: 460px;
+  2747→  padding: 16px;
+  2748→  /* Re-enable pointer events on the stack so the toast body is clickable */
+  2749→  pointer-events: auto;
+  2750→}
+  2751→
+  2752→.toast-alert {
+  2753→  position: relative;
+  2754→  display: flex;
+  2755→  align-items: flex-start;
+  2756→  gap: 12px;
+  2757→  width: 100%;
+  2758→  background: #ffffff;
+  2759→  border-radius: 12px;
+  2760→  padding: 14px 16px 14px 18px;
+  2761→  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  2762→  overflow: hidden;
+  2763→  cursor: pointer;
+  2764→  font-family: var(--font-nunito), sans-serif;
+  2765→  animation: toast-pop-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  2766→  /* Ensure long messages wrap and never cause horizontal overflow */
+  2767→  word-break: break-word;
+  2768→  overflow-wrap: break-word;
+  2769→  /* Prevent text selection on rapid click */
+  2770→  user-select: none;
+  2771→  -webkit-tap-highlight-color: transparent;
+  2772→}
+  2773→
+  2774→@keyframes toast-pop-in {
+  2775→  0% {
+  2776→    opacity: 0;
+  2777→    transform: scale(0.85) translateY(-10px);
+  2778→  }
+  2779→  60% {
+  2780→    opacity: 1;
+  2781→    transform: scale(1.02) translateY(0);
+  2782→  }
+  2783→  100% {
+  2784→    opacity: 1;
+  2785→    transform: scale(1) translateY(0);
+  2786→  }
+  2787→}
+  2788→
+  2789→@keyframes toast-progress-shrink {
+  2790→  from { width: 100%; }
+  2791→  to { width: 0%; }
+  2792→}
+  2793→
+  2794→.toast-alert-accent {
+  2795→  position: absolute;
+  2796→  top: 0;
+  2797→  left: 0;
+  2798→  bottom: 0;
+  2799→  width: 5px;
+  2800→  border-radius: 12px 0 0 12px;
+  2801→}
+  2802→
+  2803→.toast-alert-icon {
+  2804→  flex-shrink: 0;
+  2805→  width: 38px;
+  2806→  height: 38px;
+  2807→  border-radius: 50%;
+  2808→  display: flex;
+  2809→  align-items: center;
+  2810→  justify-content: center;
+  2811→  font-size: 1.1rem;
+  2812→}
+  2813→
+  2814→.toast-alert-body {
+  2815→  flex: 1 1 auto;
+  2816→  min-width: 0; /* allow flex item to shrink so text wraps */
+  2817→  display: flex;
+  2818→  flex-direction: column;
+  2819→  gap: 2px;
+  2820→  padding-top: 1px;
+  2821→}
+  2822→
+  2823→.toast-alert-title {
+  2824→  font-size: 0.95rem;
+  2825→  font-weight: 800;
+  2826→  line-height: 1.3;
+  2827→}
+  2828→
+  2829→.toast-alert-message {
+  2830→  font-size: 0.84rem;
+  2831→  color: #4b5563;
+  2832→  line-height: 1.5;
+  2833→  font-weight: 500;
+  2834→}
+  2835→
+  2836→.toast-alert-action {
+  2837→  display: inline-flex;
+  2838→  align-items: center;
+  2839→  justify-content: center;
+  2840→  align-self: flex-start;
+  2841→  margin-top: 8px;
+  2842→  padding: 7px 16px;
+  2843→  border: none;
+  2844→  border-radius: 8px;
+  2845→  color: #fff;
+  2846→  font-size: 0.82rem;
+  2847→  font-weight: 700;
+  2848→  font-family: var(--font-nunito), sans-serif;
+  2849→  cursor: pointer;
+  2850→  transition: transform 0.15s, filter 0.15s;
+  2851→  -webkit-tap-highlight-color: transparent;
+  2852→}
+  2853→
+  2854→.toast-alert-action:hover {
+  2855→  transform: translateY(-1px);
+  2856→  filter: brightness(1.05);
+  2857→}
+  2858→
+  2859→.toast-alert-action:active {
+  2860→  transform: translateY(0);
+  2861→}
+  2862→
+  2863→.toast-alert-action:focus-visible {
+  2864→  outline: 2px solid var(--clay-orange);
+  2865→  outline-offset: 2px;
+  2866→}
+  2867→
+  2868→.toast-alert-close {
+  2869→  flex-shrink: 0;
+  2870→  width: 28px;
+  2871→  height: 28px;
+  2872→  border-radius: 50%;
+  2873→  background: transparent;
+  2874→  border: none;
+  2875→  color: #9ca3af;
+  2876→  font-size: 0.85rem;
+  2877→  cursor: pointer;
+  2878→  display: flex;
+  2879→  align-items: center;
+  2880→  justify-content: center;
+  2881→  transition: background 0.15s, color 0.15s;
+  2882→  -webkit-tap-highlight-color: transparent;
+  2883→}
+  2884→
+  2885→.toast-alert-close:hover {
+  2886→  background: #f3f4f6;
+  2887→  color: #374151;
+  2888→}
+  2889→
+  2890→.toast-alert-close:focus-visible {
+  2891→  outline: 2px solid var(--clay-orange);
+  2892→  outline-offset: 2px;
+  2893→}
+  2894→
+  2895→.toast-alert-progress {
+  2896→  position: absolute;
+  2897→  bottom: 0;
+  2898→  left: 0;
+  2899→  height: 3px;
+  2900→  width: 100%;
+  2901→  opacity: 0.85;
+  2902→}
+  2903→
+  2904→/* ---- TOAST RESPONSIVE: MOBILE ---- */
+  2905→@media (max-width: 575px) {
+  2906→  .toast-center-stack {
+  2907→    max-width: 100%;
+  2908→    padding: 12px;
+  2909→    gap: 8px;
+  2910→  }
+  2911→  .toast-alert {
+  2912→    padding: 12px 14px 12px 16px;
+  2913→    gap: 10px;
+  2914→    border-radius: 10px;
+  2915→  }
+  2916→  .toast-alert-icon {
+  2917→    width: 34px;
+  2918→    height: 34px;
+  2919→    font-size: 1rem;
+  2920→  }
+  2921→  .toast-alert-title {
+  2922→    font-size: 0.88rem;
+  2923→  }
+  2924→  .toast-alert-message {
+  2925→    font-size: 0.78rem;
+  2926→    line-height: 1.45;
+  2927→  }
+  2928→  .toast-alert-close {
+  2929→    width: 26px;
+  2930→    height: 26px;
+  2931→    font-size: 0.8rem;
+  2932→  }
+  2933→}
+  2934→
+  2935→/* ---- TOAST RESPONSIVE: VERY SMALL PHONES ---- */
+  2936→@media (max-width: 380px) {
+  2937→  .toast-center-stack {
+  2938→    padding: 8px;
+  2939→  }
+  2940→  .toast-alert {
+  2941→    padding: 10px 12px 10px 14px;
+  2942→    gap: 8px;
+  2943→  }
+  2944→  .toast-alert-icon {
+  2945→    width: 30px;
+  2946→    height: 30px;
+  2947→    font-size: 0.92rem;
+  2948→  }
+  2949→  .toast-alert-title {
+  2950→    font-size: 0.82rem;
+  2951→  }
+  2952→  .toast-alert-message {
+  2953→    font-size: 0.74rem;
+  2954→    line-height: 1.4;
+  2955→  }
+  2956→  .toast-alert-close {
+  2957→    width: 24px;
+  2958→    height: 24px;
+  2959→    font-size: 0.75rem;
+  2960→  }
+  2961→}
+  2962→
+  2963→/* ---- TOAST RESPONSIVE: LANDSCAPE PHONES (short height) ---- */
+  2964→/* Move toasts to top of screen so they don't get cut off by address bar */
+  2965→@media (max-height: 500px) and (orientation: landscape) {
+  2966→  .toast-center-overlay {
+  2967→    top: 16px;
+  2968→    transform: translate(-50%, 0);
+  2969→    align-items: flex-start;
+  2970→  }
+  2971→  .toast-center-stack {
+  2972→    max-width: 480px;
+  2973→    padding: 8px;
+  2974→  }
+  2975→  .toast-alert {
+  2976→    padding: 10px 12px 10px 14px;
+  2977→  }
+  2978→  .toast-alert-icon {
+  2979→    width: 28px;
+  2980→    height: 28px;
+  2981→    font-size: 0.92rem;
+  2982→  }
+  2983→  .toast-alert-title {
+  2984→    font-size: 0.82rem;
+  2985→  }
+  2986→  .toast-alert-message {
+  2987→    font-size: 0.74rem;
+  2988→    line-height: 1.4;
+  2989→  }
+  2990→}
+  2991→
+  2992→/* =============================================================
+  2993→   MENU NOTICE MODAL & LOGIN PROMPT
+  2994→   ============================================================= */
+  2995→.menu-notice-overlay {
+  2996→  position: fixed;
+  2997→  inset: 0;
+  2998→  background: rgba(44, 16, 8, 0.75);
+  2999→  backdrop-filter: blur(8px);
+  3000→  -webkit-backdrop-filter: blur(8px);
+  3001→  z-index: 10000;
+  3002→  display: flex;
+  3003→  align-items: center;
+  3004→  justify-content: center;
+  3005→  padding: 16px;
+  3006→  /* Allow overlay to scroll if modal taller than viewport (older browsers) */
+  3007→  overflow-y: auto;
+  3008→  -webkit-overflow-scrolling: touch;
+  3009→  overscroll-behavior: contain;
+  3010→  animation: auth-fade-in 0.2s ease;
+  3011→}
+  3012→
+  3013→.menu-notice-modal {
+  3014→  position: relative;
+  3015→  background: var(--card-bg);
+  3016→  border-radius: 16px;
+  3017→  padding: 32px 28px 16px;
+  3018→  width: 100%;
+  3019→  max-width: 540px;
+  3020→  /* Use dvh (dynamic viewport) for mobile, vh as fallback for older browsers.
+  3021→     This fixes the "can not scroll down" issue on iOS Safari where the
+  3022→     dynamic toolbar caused 90vh to be larger than the visible area. */
+  3023→  max-height: 90vh;
+  3024→  max-height: 90dvh;
+  3025→  /* Modal becomes a flex container: header (auto) / points (1fr scroll) / footer (auto) */
+  3026→  display: flex;
+  3027→  flex-direction: column;
+  3028→  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+  3029→  animation: auth-slide-up 0.3s ease;
+  3030→  /* Prevent body scroll chaining when user reaches end of modal scroll */
+  3031→  overscroll-behavior: contain;
+  3032→}
+  3033→
+  3034→/* The X close button — always visible at top-right */
+  3035→.menu-notice-close-x {
+  3036→  position: absolute;
+  3037→  top: 12px;
+  3038→  right: 12px;
+  3039→  width: 36px;
+  3040→  height: 36px;
+  3041→  border-radius: 50%;
+  3042→  background: var(--section-alt);
+  3043→  border: none;
+  3044→  color: var(--text-muted);
+  3045→  font-size: 1rem;
+  3046→  cursor: pointer;
+  3047→  display: flex;
+  3048→  align-items: center;
+  3049→  justify-content: center;
+  3050→  transition: background 0.2s, color 0.2s, transform 0.15s;
+  3051→  z-index: 2;
+  3052→}
+  3053→
+  3054→.menu-notice-close-x:hover {
+  3055→  background: var(--dark-red);
+  3056→  color: #fff;
+  3057→  transform: rotate(90deg);
+  3058→}
+  3059→
+  3060→.menu-notice-close-x:focus-visible {
+  3061→  outline: 2px solid var(--clay-orange);
+  3062→  outline-offset: 2px;
+  3063→}
+  3064→
+  3065→.menu-notice-header {
+  3066→  text-align: center;
+  3067→  margin-bottom: 24px;
+  3068→}
+  3069→
+  3070→.menu-notice-icon {
+  3071→  font-size: 2.6rem;
+  3072→  display: block;
+  3073→  margin-bottom: 12px;
+  3074→}
+  3075→
+  3076→.menu-notice-header h2 {
+  3077→  font-family: var(--font-playfair), serif;
+  3078→  font-size: 1.4rem;
+  3079→  font-weight: 800;
+  3080→  color: var(--dark-red);
+  3081→  margin-bottom: 6px;
+  3082→}
+  3083→
+  3084→.menu-notice-subtitle {
+  3085→  color: var(--text-muted);
+  3086→  font-size: 0.85rem;
+  3087→  margin: 0;
+  3088→}
+  3089→
+  3090→.menu-notice-points {
+  3091→  display: flex;
+  3092→  flex-direction: column;
+  3093→  gap: 12px;
+  3094→  margin-bottom: 16px;
+  3095→  /* ONLY this section scrolls — header & footer stay fixed.
+  3096→     This is the core fix for "can not scroll down". */
+  3097→  flex: 1 1 auto;
+  3098→  min-height: 0;
+  3099→  overflow-y: auto;
+  3100→  -webkit-overflow-scrolling: touch;
+  3101→  overscroll-behavior: contain;
+  3102→  padding-right: 4px; /* gutter so scroll bar doesn't overlap content */
+  3103→}
+  3104→
+  3105→/* Webkit scrollbar styling — slim, themed */
+  3106→.menu-notice-points::-webkit-scrollbar {
+  3107→  width: 6px;
+  3108→}
+  3109→.menu-notice-points::-webkit-scrollbar-track {
+  3110→  background: transparent;
+  3111→}
+  3112→.menu-notice-points::-webkit-scrollbar-thumb {
+  3113→  background: rgba(122, 80, 48, 0.3);
+  3114→  border-radius: 3px;
+  3115→}
+  3116→.menu-notice-points::-webkit-scrollbar-thumb:hover {
+  3117→  background: rgba(122, 80, 48, 0.5);
+  3118→}
+  3119→
+  3120→.menu-notice-point {
+  3121→  display: flex;
+  3122→  gap: 12px;
+  3123→  align-items: flex-start;
+  3124→  padding: 12px 14px;
+  3125→  background: var(--section-alt);
+  3126→  border-radius: 10px;
+  3127→  border-left: 3px solid var(--clay-orange);
+  3128→}
+  3129→
+  3130→.menu-notice-point-icon {
+  3131→  width: 32px;
+  3132→  height: 32px;
+  3133→  border-radius: 50%;
+  3134→  background: var(--dark-red);
+  3135→  color: #fff;
+  3136→  display: flex;
+  3137→  align-items: center;
+  3138→  justify-content: center;
+  3139→  font-size: 0.85rem;
+  3140→  flex-shrink: 0;
+  3141→}
+  3142→
+  3143→.menu-notice-point-body {
+  3144→  display: flex;
+  3145→  flex-direction: column;
+  3146→  gap: 2px;
+  3147→}
+  3148→
+  3149→.menu-notice-point-body strong {
+  3150→  color: var(--text-dark);
+  3151→  font-size: 0.88rem;
+  3152→  font-family: var(--font-nunito), sans-serif;
+  3153→}
+  3154→
+  3155→.menu-notice-point-body span {
+  3156→  color: var(--text-muted);
+  3157→  font-size: 0.78rem;
+  3158→  line-height: 1.5;
+  3159→}
+  3160→
+  3161→.menu-notice-footer {
+  3162→  display: flex;
+  3163→  gap: 10px;
+  3164→  justify-content: flex-end;
+  3165→  /* Footer never shrinks and stays at the bottom of the modal flex column.
+  3166→     This means the Close + I Understand buttons are ALWAYS visible,
+  3167→     no matter how long the scrollable points list is. */
+  3168→  flex: 0 0 auto;
+  3169→  padding-top: 12px;
+  3170→  border-top: 1px solid var(--border-color);
+  3171→  margin-top: 4px;
+  3172→}
+  3173→
+  3174→.menu-notice-btn-secondary {
+  3175→  padding: 10px 18px;
+  3176→  background: transparent;
+  3177→  border: 1.5px solid var(--border-color);
+  3178→  border-radius: 10px;
+  3179→  color: var(--text-muted);
+  3180→  font-weight: 700;
+  3181→  font-size: 0.88rem;
+  3182→  cursor: pointer;
+  3183→  font-family: var(--font-nunito), sans-serif;
+  3184→  transition: all 0.2s;
+  3185→}
+  3186→
+  3187→.menu-notice-btn-secondary:hover {
+  3188→  border-color: var(--dark-red);
+  3189→  color: var(--dark-red);
+  3190→}
+  3191→
+  3192→.menu-notice-btn-primary {
+  3193→  padding: 10px 22px;
+  3194→  background: var(--dark-red);
+  3195→  border: none;
+  3196→  border-radius: 10px;
+  3197→  color: #fff;
+  3198→  font-weight: 700;
+  3199→  font-size: 0.88rem;
+  3200→  cursor: pointer;
+  3201→  font-family: var(--font-nunito), sans-serif;
+  3202→  transition: all 0.2s;
+  3203→}
+  3204→
+  3205→.menu-notice-btn-primary:hover {
+  3206→  background: #5a0808;
+  3207→  transform: translateY(-1px);
+  3208→}
+  3209→
+  3210→/* Login prompt variant */
+  3211→.login-prompt-modal {
+  3212→  max-width: 440px;
+  3213→}
+  3214→
+  3215→.login-prompt-body {
+  3216→  margin-bottom: 24px;
+  3217→  color: var(--text-body);
+  3218→  font-size: 0.92rem;
+  3219→  line-height: 1.6;
+  3220→  text-align: center;
+  3221→  /* Allow growth in flex column so text is never cut off */
+  3222→  flex: 0 1 auto;
+  3223→}
+  3224→
+  3225→/* =============================================================
+  3226→   CART DRAWER (PLATE)
+  3227→   ============================================================= */
+  3228→.cart-drawer-overlay {
+  3229→  position: fixed;
+  3230→  inset: 0;
+  3231→  background: rgba(44, 16, 8, 0.55);
+  3232→  backdrop-filter: blur(4px);
+  3233→  z-index: 10001;
+  3234→  animation: auth-fade-in 0.2s ease;
+  3235→}
+  3236→
+  3237→.cart-drawer {
+  3238→  position: fixed;
+  3239→  top: 0;
+  3240→  right: 0;
+  3241→  width: 420px;
+  3242→  max-width: 92vw;
+  3243→  height: 100vh;
+  3244→  background: var(--card-bg);
+  3245→  box-shadow: -8px 0 40px rgba(44, 16, 8, 0.2);
+  3246→  z-index: 10002;
+  3247→  display: flex;
+  3248→  flex-direction: column;
+  3249→  animation: cart-slide-in 0.3s ease;
+  3250→}
+  3251→
+  3252→@keyframes cart-slide-in {
+  3253→  from { transform: translateX(100%); }
+  3254→  to { transform: translateX(0); }
+  3255→}
+  3256→
+  3257→.cart-drawer-header {
+  3258→  display: flex;
+  3259→  align-items: center;
+  3260→  justify-content: space-between;
+  3261→  padding: 18px 22px;
+  3262→  background: linear-gradient(135deg, var(--dark-red), #a01818);
+  3263→  color: #fff;
+  3264→  flex-shrink: 0;
+  3265→}
+  3266→
+  3267→.cart-drawer-title-wrap {
+  3268→  display: flex;
+  3269→  align-items: center;
+  3270→  gap: 10px;
+  3271→}
+  3272→
+  3273→.cart-drawer-icon { font-size: 1.4rem; }
+  3274→
+  3275→.cart-drawer-header h2 {
+  3276→  font-family: var(--font-playfair), serif;
+  3277→  font-size: 1.25rem;
+  3278→  font-weight: 700;
+  3279→  margin: 0;
+  3280→}
+  3281→
+  3282→.cart-drawer-count {
+  3283→  background: var(--mustard-bright);
+  3284→  color: var(--dark-red);
+  3285→  font-size: 0.78rem;
+  3286→  font-weight: 800;
+  3287→  padding: 2px 9px;
+  3288→  border-radius: 12px;
+  3289→  min-width: 24px;
+  3290→  text-align: center;
+  3291→}
+  3292→
+  3293→.cart-drawer-close {
+  3294→  background: rgba(255, 255, 255, 0.15);
+  3295→  border: none;
+  3296→  color: #fff;
+  3297→  width: 32px;
+  3298→  height: 32px;
+  3299→  border-radius: 8px;
+  3300→  cursor: pointer;
+  3301→  font-size: 1rem;
+  3302→  transition: all 0.2s;
+  3303→}
+  3304→
+  3305→.cart-drawer-close:hover {
+  3306→  background: rgba(255, 255, 255, 0.3);
+  3307→}
+  3308→
+  3309→.cart-drawer-items {
+  3310→  flex: 1;
+  3311→  overflow-y: auto;
+  3312→  padding: 12px 16px;
+  3313→  display: flex;
+  3314→  flex-direction: column;
+  3315→  gap: 10px;
+  3316→}
+  3317→
+  3318→.cart-item {
+  3319→  display: flex;
+  3320→  gap: 12px;
+  3321→  padding: 14px;
+  3322→  background: var(--section-alt);
+  3323→  border-radius: 12px;
+  3324→  border: 1px solid var(--border-light);
+  3325→}
+  3326→
+  3327→.cart-item-emoji {
+  3328→  font-size: 1.6rem;
+  3329→  flex-shrink: 0;
+  3330→  width: 44px;
+  3331→  height: 44px;
+  3332→  display: flex;
+  3333→  align-items: center;
+  3334→  justify-content: center;
+  3335→  background: var(--card-bg);
+  3336→  border-radius: 8px;
+  3337→  border: 1px solid var(--border-light);
+  3338→}
+  3339→
+  3340→.cart-item-body {
+  3341→  flex: 1;
+  3342→  min-width: 0;
+  3343→  display: flex;
+  3344→  flex-direction: column;
+  3345→  gap: 4px;
+  3346→}
+  3347→
+  3348→.cart-item-name {
+  3349→  font-family: var(--font-playfair), serif;
+  3350→  font-size: 0.95rem;
+  3351→  font-weight: 700;
+  3352→  color: var(--text-dark);
+  3353→  line-height: 1.3;
+  3354→  overflow-wrap: break-word;
+  3355→  word-break: break-word;
+  3356→}
+  3357→
+  3358→.cart-item-variant {
+  3359→  font-size: 0.74rem;
+  3360→  color: var(--clay-orange);
+  3361→  font-weight: 700;
+  3362→}
+  3363→
+  3364→.cart-item-price-row {
+  3365→  font-size: 0.78rem;
+  3366→  color: var(--text-muted);
+  3367→}
+  3368→
+  3369→.cart-item-unit-price {
+  3370→  font-weight: 600;
+  3371→}
+  3372→
+  3373→.cart-item-per-piece {
+  3374→  color: var(--text-light);
+  3375→  font-size: 0.72rem;
+  3376→}
+  3377→
+  3378→.cart-item-stepper {
+  3379→  display: inline-flex;
+  3380→  align-items: center;
+  3381→  gap: 0;
+  3382→  margin-top: 6px;
+  3383→  border: 1.5px solid var(--border-color);
+  3384→  border-radius: 20px;
+  3385→  overflow: hidden;
+  3386→  align-self: flex-start;
+  3387→  background: var(--card-bg);
+  3388→}
+  3389→
+  3390→.cart-stepper-btn {
+  3391→  width: 30px;
+  3392→  height: 30px;
+  3393→  background: transparent;
+  3394→  border: none;
+  3395→  cursor: pointer;
+  3396→  color: var(--dark-red);
+  3397→  font-size: 0.75rem;
+  3398→  display: flex;
+  3399→  align-items: center;
+  3400→  justify-content: center;
+  3401→  transition: all 0.2s;
+  3402→}
+  3403→
+  3404→.cart-stepper-btn:hover:not(:disabled) {
+  3405→  background: rgba(122, 12, 12, 0.1);
+  3406→}
+  3407→
+  3408→.cart-stepper-btn:disabled {
+  3409→  opacity: 0.4;
+  3410→  cursor: not-allowed;
+  3411→}
+  3412→
+  3413→.cart-stepper-qty {
+  3414→  min-width: 32px;
+  3415→  text-align: center;
+  3416→  font-weight: 800;
+  3417→  font-size: 0.88rem;
+  3418→  color: var(--text-dark);
+  3419→  font-family: var(--font-nunito), sans-serif;
+  3420→}
+  3421→
+  3422→.cart-item-right {
+  3423→  display: flex;
+  3424→  flex-direction: column;
+  3425→  align-items: flex-end;
+  3426→  justify-content: space-between;
+  3427→  gap: 8px;
+  3428→  flex-shrink: 0;
+  3429→}
+  3430→
+  3431→.cart-item-line-total {
+  3432→  font-family: var(--font-playfair), serif;
+  3433→  font-size: 1rem;
+  3434→  font-weight: 800;
+  3435→  color: var(--dark-red);
+  3436→  white-space: nowrap;
+  3437→}
+  3438→
+  3439→.cart-item-remove {
+  3440→  background: transparent;
+  3441→  border: 1px solid #fecaca;
+  3442→  color: #dc2626;
+  3443→  width: 30px;
+  3444→  height: 30px;
+  3445→  border-radius: 8px;
+  3446→  cursor: pointer;
+  3447→  font-size: 0.78rem;
+  3448→  transition: all 0.2s;
+  3449→  display: flex;
+  3450→  align-items: center;
+  3451→  justify-content: center;
+  3452→}
+  3453→
+  3454→.cart-item-remove:hover:not(:disabled) {
+  3455→  background: #fef2f2;
+  3456→  border-color: #dc2626;
+  3457→}
+  3458→
+  3459→.cart-item-remove:disabled {
+  3460→  opacity: 0.4;
+  3461→  cursor: not-allowed;
+  3462→}
+  3463→
+  3464→/* ---- EMPTY STATE ---- */
+  3465→.cart-drawer-empty {
+  3466→  flex: 1;
+  3467→  display: flex;
+  3468→  flex-direction: column;
+  3469→  align-items: center;
+  3470→  justify-content: center;
+  3471→  padding: 40px 24px;
+  3472→  text-align: center;
+  3473→}
+  3474→
+  3475→.cart-drawer-empty-icon {
+  3476→  font-size: 3.5rem;
+  3477→  margin-bottom: 16px;
+  3478→  opacity: 0.6;
+  3479→}
+  3480→
+  3481→.cart-drawer-empty h3 {
+  3482→  font-family: var(--font-playfair), serif;
+  3483→  font-size: 1.3rem;
+  3484→  color: var(--dark-red);
+  3485→  margin-bottom: 8px;
+  3486→}
+  3487→
+  3488→.cart-drawer-empty p {
+  3489→  color: var(--text-muted);
+  3490→  font-size: 0.88rem;
+  3491→  margin-bottom: 22px;
+  3492→  max-width: 280px;
+  3493→  line-height: 1.5;
+  3494→}
+  3495→
+  3496→.cart-drawer-browse-btn {
+  3497→  padding: 11px 24px;
+  3498→  background: var(--dark-red);
+  3499→  border: none;
+  3500→  border-radius: 10px;
+  3501→  color: #fff;
+  3502→  font-weight: 700;
+  3503→  font-size: 0.92rem;
+  3504→  cursor: pointer;
+  3505→  font-family: var(--font-nunito), sans-serif;
+  3506→  transition: all 0.2s;
+  3507→}
+  3508→
+  3509→.cart-drawer-browse-btn:hover {
+  3510→  background: #5a0808;
+  3511→  transform: translateY(-1px);
+  3512→}
+  3513→
+  3514→/* ---- CART FOOTER ---- */
+  3515→.cart-drawer-footer {
+  3516→  border-top: 1px solid var(--border-light);
+  3517→  padding: 16px 20px;
+  3518→  background: var(--card-bg);
+  3519→  flex-shrink: 0;
+  3520→}
+  3521→
+  3522→.cart-totals-row {
+  3523→  display: flex;
+  3524→  justify-content: space-between;
+  3525→  align-items: center;
+  3526→  margin-bottom: 8px;
+  3527→  font-size: 0.88rem;
+  3528→}
+  3529→
+  3530→.cart-totals-row-muted {
+  3531→  color: var(--text-light);
+  3532→  font-size: 0.74rem;
+  3533→  font-style: italic;
+  3534→}
+  3535→
+  3536→.cart-totals-row-grand {
+  3537→  border-top: 1.5px dashed var(--border-color);
+  3538→  margin-top: 8px;
+  3539→  padding-top: 12px;
+  3540→  margin-bottom: 16px;
+  3541→  font-size: 1.05rem;
+  3542→  font-weight: 800;
+  3543→  color: var(--dark-red);
+  3544→  font-family: var(--font-playfair), serif;
+  3545→}
+  3546→
+  3547→.cart-totals-value {
+  3548→  font-weight: 700;
+  3549→  color: var(--text-dark);
+  3550→}
+  3551→
+  3552→.cart-checkout-btn {
+  3553→  width: 100%;
+  3554→  padding: 13px 20px;
+  3555→  background: linear-gradient(135deg, var(--dark-red), #a01818);
+  3556→  border: none;
+  3557→  border-radius: 10px;
+  3558→  color: #fff;
+  3559→  font-weight: 700;
+  3560→  font-size: 0.95rem;
+  3561→  cursor: pointer;
+  3562→  font-family: var(--font-nunito), sans-serif;
+  3563→  transition: all 0.2s;
+  3564→  margin-bottom: 8px;
+  3565→  opacity: 1;
+  3566→}
+  3567→
+  3568→.cart-checkout-btn:hover {
+  3569→  filter: brightness(1.1);
+  3570→  transform: translateY(-1px);
+  3571→}
+  3572→
+  3573→.cart-checkout-btn:active {
+  3574→  transform: translateY(0);
+  3575→}
+  3576→
+  3577→.cart-clear-btn {
+  3578→  width: 100%;
+  3579→  padding: 10px 20px;
+  3580→  background: transparent;
+  3581→  border: 1.5px solid #fecaca;
+  3582→  border-radius: 10px;
+  3583→  color: #dc2626;
+  3584→  font-weight: 700;
+  3585→  font-size: 0.85rem;
+  3586→  cursor: pointer;
+  3587→  font-family: var(--font-nunito), sans-serif;
+  3588→  transition: all 0.2s;
+  3589→}
+  3590→
+  3591→.cart-clear-btn:hover:not(:disabled) {
+  3592→  background: #fef2f2;
+  3593→}
+  3594→
+  3595→.cart-clear-btn:disabled {
+  3596→  opacity: 0.4;
+  3597→  cursor: not-allowed;
+  3598→}
+  3599→
+  3600→/* =============================================================
+  3601→   FLOATING CART BUTTON
+  3602→   -------------------------------------------------------------
+  3603→   Vertical layout (bottom → top):
+  3604→     - Call button:   bottom 40px,  height 52px → top at 92px
+  3605→     - GAP:           18px
+  3606→     - Cart button:   bottom 110px, height 54px → top at 164px
+  3607→     - GAP:           18px
+  3608→     - Back-to-top:   bottom 190px (when visible)
+  3609→   ============================================================= */
+  3610→.floating-cart-btn {
+  3611→  position: fixed;
+  3612→  bottom: 110px;
+  3613→  right: 22px;
+  3614→  width: 54px;
+  3615→  height: 54px;
+  3616→  border-radius: 50%;
+  3617→  background: linear-gradient(135deg, var(--dark-red), #a01818);
+  3618→  color: #fff;
+  3619→  border: none;
+  3620→  cursor: pointer;
+  3621→  box-shadow: 0 6px 20px rgba(122, 12, 12, 0.4);
+  3622→  z-index: 1040;
+  3623→  display: flex;
+  3624→  align-items: center;
+  3625→  justify-content: center;
+  3626→  font-size: 1.2rem;
+  3627→  transition: all 0.3s;
+  3628→}
+  3629→
+  3630→.floating-cart-btn:hover {
+  3631→  transform: scale(1.08) translateY(-2px);
+  3632→  box-shadow: 0 10px 28px rgba(122, 12, 12, 0.5);
+  3633→}
+  3634→
+  3635→.floating-cart-badge {
+  3636→  position: absolute;
+  3637→  top: -4px;
+  3638→  right: -4px;
+  3639→  background: var(--mustard-bright);
+  3640→  color: var(--dark-red);
+  3641→  font-size: 0.7rem;
+  3642→  font-weight: 800;
+  3643→  padding: 2px 6px;
+  3644→  border-radius: 10px;
+  3645→  min-width: 20px;
+  3646→  text-align: center;
+  3647→  border: 2px solid var(--card-bg);
+  3648→  font-family: var(--font-nunito), sans-serif;
+  3649→}
+  3650→
+  3651→/* =============================================================
+  3652→   RESPONSIVE — CART + MENU
+  3653→   ============================================================= */
+  3654→@media (max-width: 575px) {
+  3655→  .menu-item-card-v2 {
+  3656→    padding: 14px 14px;
+  3657→  }
+  3658→  .menu-item-card-v2 .menu-item-body {
+  3659→    flex: 1 1 100%;
+  3660→  }
+  3661→  .menu-item-card-v2 .menu-item-right-v2 {
+  3662→    flex-direction: row;
+  3663→    align-items: center;
+  3664→    width: 100%;
+  3665→    justify-content: space-between;
+  3666→    gap: 10px;
+  3667→  }
+  3668→  .menu-item-price-block { text-align: left; }
+  3669→  .menu-item-variant-select {
+  3670→    flex: 1 1 100%;
+  3671→    max-width: 100%;
+  3672→  }
+  3673→  .menu-item-variant-row {
+  3674→    flex-direction: column;
+  3675→    align-items: stretch;
+  3676→    gap: 4px;
+  3677→  }
+  3678→  .menu-item-variant-label {
+  3679→    margin-bottom: 2px;
+  3680→  }
+  3681→  .btn-add-to-plate {
+  3682→    font-size: 0.74rem;
+  3683→    padding: 7px 14px;
+  3684→  }
+  3685→  /* Menu Notice Modal — mobile responsive */
+  3686→  .menu-notice-modal {
+  3687→    padding: 24px 18px 14px;
+  3688→    /* On mobile, stick modal to top so user can scroll content naturally.
+  3689→       align-items: flex-start on overlay achieves this. */
+  3690→    max-height: 94vh;
+  3691→    max-height: 94dvh;
+  3692→    border-radius: 14px;
+  3693→  }
+  3694→  .menu-notice-overlay {
+  3695→    align-items: flex-start;
+  3696→    padding: 12px;
+  3697→  }
+  3698→  .menu-notice-header {
+  3699→    margin-bottom: 16px;
+  3700→    padding-right: 32px; /* room for X close button */
+  3701→  }
+  3702→  .menu-notice-icon {
+  3703→    font-size: 2.2rem;
+  3704→    margin-bottom: 8px;
+  3705→  }
+  3706→  .menu-notice-header h2 { font-size: 1.15rem; }
+  3707→  .menu-notice-subtitle { font-size: 0.8rem; }
+  3708→  .menu-notice-points {
+  3709→    gap: 10px;
+  3710→    margin-bottom: 12px;
+  3711→  }
+  3712→  .menu-notice-point {
+  3713→    padding: 10px 12px;
+  3714→  }
+  3715→  .menu-notice-point-icon {
+  3716→    width: 28px;
+  3717→    height: 28px;
+  3718→    font-size: 0.78rem;
+  3719→  }
+  3720→  .menu-notice-point-body strong { font-size: 0.84rem; }
+  3721→  .menu-notice-point-body span { font-size: 0.74rem; }
+  3722→  .menu-notice-footer {
+  3723→    flex-direction: column-reverse;
+  3724→    gap: 8px;
+  3725→    padding-top: 10px;
+  3726→  }
+  3727→  .menu-notice-btn-secondary,
+  3728→  .menu-notice-btn-primary {
+  3729→    width: 100%;
+  3730→    /* Touch-friendly: min 44px height per Apple/Google guidelines */
+  3731→    min-height: 44px;
+  3732→    padding: 11px 18px;
+  3733→    font-size: 0.9rem;
+  3734→  }
+  3735→  .menu-notice-close-x {
+  3736→    width: 32px;
+  3737→    height: 32px;
+  3738→    font-size: 0.9rem;
+  3739→    top: 10px;
+  3740→    right: 10px;
+  3741→  }
+  3742→  .cart-drawer {
+  3743→    width: 100%;
+  3744→    max-width: 100%;
+  3745→  }
+  3746→  .cart-item {
+  3747→    padding: 12px;
+  3748→  }
+  3749→  .cart-item-emoji {
+  3750→    width: 38px;
+  3751→    height: 38px;
+  3752→    font-size: 1.3rem;
+  3753→  }
+  3754→  .cart-item-name {
+  3755→    font-size: 0.88rem;
+  3756→  }
+  3757→  .floating-cart-btn {
+  3758→    width: 50px;
+  3759→    height: 50px;
+  3760→    bottom: 105px;
+  3761→    right: 16px;
+  3762→    font-size: 1.1rem;
+  3763→  }
+  3764→  .floating-call {
+  3765→    width: 48px;
+  3766→    height: 48px;
+  3767→    bottom: 35px;
+  3768→    right: 16px;
+  3769→    font-size: 1.25rem;
+  3770→  }
+  3771→  .back-to-top-btn {
+  3772→    bottom: 175px;
+  3773→    right: 16px;
+  3774→    width: 42px;
+  3775→    height: 42px;
+  3776→  }
+  3777→}
+  3778→
+  3779→/* Very small phones — compact layout, smaller text */
+  3780→@media (max-width: 380px) {
+  3781→  .menu-notice-modal {
+  3782→    padding: 20px 14px 12px;
+  3783→    max-height: 96vh;
+  3784→    max-height: 96dvh;
+  3785→    border-radius: 12px;
+  3786→  }
+  3787→  .menu-notice-overlay {
+  3788→    padding: 8px;
+  3789→  }
+  3790→  .menu-notice-header {
+  3791→    margin-bottom: 12px;
+  3792→    padding-right: 28px;
+  3793→  }
+  3794→  .menu-notice-icon {
+  3795→    font-size: 1.9rem;
+  3796→    margin-bottom: 6px;
+  3797→  }
+  3798→  .menu-notice-header h2 { font-size: 1.02rem; }
+  3799→  .menu-notice-subtitle { font-size: 0.74rem; }
+  3800→  .menu-notice-points {
+  3801→    gap: 8px;
+  3802→    margin-bottom: 10px;
+  3803→  }
+  3804→  .menu-notice-point {
+  3805→    padding: 8px 10px;
+  3806→    gap: 10px;
+  3807→  }
+  3808→  .menu-notice-point-icon {
+  3809→    width: 26px;
+  3810→    height: 26px;
+  3811→    font-size: 0.72rem;
+  3812→  }
+  3813→  .menu-notice-point-body strong { font-size: 0.78rem; }
+  3814→  .menu-notice-point-body span { font-size: 0.7rem; line-height: 1.45; }
+  3815→  .menu-notice-btn-secondary,
+  3816→  .menu-notice-btn-primary {
+  3817→    padding: 10px 14px;
+  3818→    font-size: 0.84rem;
+  3819→    min-height: 42px;
+  3820→  }
+  3821→  .menu-notice-close-x {
+  3822→    width: 30px;
+  3823→    height: 30px;
+  3824→    font-size: 0.84rem;
+  3825→    top: 8px;
+  3826→    right: 8px;
+  3827→  }
+  3828→}
+  3829→
+  3830→/* Landscape phones — short height, must constrain modal */
+  3831→@media (max-height: 500px) and (orientation: landscape) {
+  3832→  .menu-notice-overlay {
+  3833→    align-items: flex-start;
+  3834→    padding: 8px;
+  3835→  }
+  3836→  .menu-notice-modal {
+  3837→    max-height: 96vh;
+  3838→    max-height: 96dvh;
+  3839→    padding: 16px 18px 10px;
+  3840→  }
+  3841→  .menu-notice-header {
+  3842→    margin-bottom: 8px;
+  3843→    padding-right: 32px;
+  3844→  }
+  3845→  .menu-notice-icon {
+  3846→    font-size: 1.6rem;
+  3847→    margin-bottom: 4px;
+  3848→  }
+  3849→  .menu-notice-header h2 { font-size: 1rem; }
+  3850→  .menu-notice-subtitle { font-size: 0.74rem; }
+  3851→  .menu-notice-points {
+  3852→    gap: 6px;
+  3853→    margin-bottom: 8px;
+  3854→  }
+  3855→  .menu-notice-point {
+  3856→    padding: 6px 10px;
+  3857→  }
+  3858→  .menu-notice-footer {
+  3859→    padding-top: 8px;
+  3860→    flex-direction: row; /* horizontal on landscape to save vertical space */
+  3861→    gap: 8px;
+  3862→  }
+  3863→  .menu-notice-btn-secondary,
+  3864→  .menu-notice-btn-primary {
+  3865→    flex: 1;
+  3866→    width: auto;
+  3867→    padding: 8px 12px;
+  3868→    min-height: 38px;
+  3869→    font-size: 0.82rem;
+  3870→  }
+  3871→}
+  3872→
+  3873→@media (min-width: 576px) and (max-width: 767px) {
+  3874→  .menu-item-card-v2 .menu-item-right-v2 {
+  3875→    flex-direction: row;
+  3876→    align-items: center;
+  3877→    width: 100%;
+  3878→    justify-content: space-between;
+  3879→  }
+  3880→  .menu-item-variant-select {
+  3881→    max-width: 280px;
+  3882→  }
+  3883→}
+  3884→
+  3885→/* =============================================
+  3886→   CHECKOUT (Phase 2 - Module 3)
+  3887→   ============================================= */
+  3888→
+  3889→.checkout-page {
+  3890→  min-height: 100vh;
+  3891→  background: var(--page-bg);
+  3892→  padding: 24px 16px 80px;
+  3893→  font-family: var(--font-nunito), 'Nunito', sans-serif;
+  3894→}
+  3895→
+  3896→.checkout-container {
+  3897→  max-width: 1080px;
+  3898→  margin: 0 auto;
+  3899→}
+  3900→
+  3901→.checkout-header {
+  3902→  text-align: center;
+  3903→  margin-bottom: 28px;
+  3904→}
+  3905→
+  3906→.checkout-header h1 {
+  3907→  font-family: var(--font-playfair), 'Playfair Display', serif;
+  3908→  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  3909→  color: var(--dark-red);
+  3910→  margin-bottom: 6px;
+  3911→}
+  3912→
+  3913→.checkout-header p {
+  3914→  color: var(--text-muted);
+  3915→  font-size: 0.95rem;
+  3916→}
+  3917→
+  3918→/* ---- PROGRESS INDICATOR ---- */
+  3919→.checkout-progress {
+  3920→  display: flex;
+  3921→  align-items: center;
+  3922→  justify-content: center;
+  3923→  flex-wrap: wrap;
+  3924→  gap: 4px;
+  3925→  margin: 0 auto 32px;
+  3926→  padding: 16px 12px;
+  3927→  background: var(--card-bg);
+  3928→  border: 1px solid var(--border-color);
+  3929→  border-radius: 14px;
+  3930→  box-shadow: 0 2px 12px rgba(122, 12, 12, 0.06);
+  3931→  max-width: 100%;
+  3932→  overflow-x: auto;
+  3933→}
+  3934→
+  3935→.checkout-progress-step {
+  3936→  display: flex;
+  3937→  align-items: center;
+  3938→  gap: 8px;
+  3939→  flex-shrink: 0;
+  3940→}
+  3941→
+  3942→.checkout-progress-circle {
+  3943→  width: 32px;
+  3944→  height: 32px;
+  3945→  border-radius: 50%;
+  3946→  display: flex;
+  3947→  align-items: center;
+  3948→  justify-content: center;
+  3949→  font-weight: 700;
+  3950→  font-size: 0.85rem;
+  3951→  background: var(--section-deep);
+  3952→  color: var(--text-muted);
+  3953→  border: 2px solid var(--border-color);
+  3954→  transition: all 0.25s ease;
+  3955→}
+  3956→
+  3957→.checkout-progress-step.active .checkout-progress-circle {
+  3958→  background: var(--dark-red);
+  3959→  color: #fff;
+  3960→  border-color: var(--dark-red);
+  3961→  box-shadow: 0 0 0 4px rgba(122, 12, 12, 0.15);
+  3962→}
+  3963→
+  3964→.checkout-progress-step.completed .checkout-progress-circle {
+  3965→  background: var(--mustard);
+  3966→  color: var(--text-dark);
+  3967→  border-color: var(--mustard);
+  3968→}
+  3969→
+  3970→.checkout-progress-label {
+  3971→  font-size: 0.78rem;
+  3972→  color: var(--text-muted);
+  3973→  font-weight: 600;
+  3974→  white-space: nowrap;
+  3975→}
+  3976→
+  3977→.checkout-progress-step.active .checkout-progress-label,
+  3978→.checkout-progress-step.completed .checkout-progress-label {
+  3979→  color: var(--text-dark);
+  3980→}
+  3981→
+  3982→.checkout-progress-connector {
+  3983→  width: 24px;
+  3984→  height: 2px;
+  3985→  background: var(--border-color);
+  3986→  margin: 0 4px;
+  3987→  flex-shrink: 0;
+  3988→}
+  3989→
+  3990→.checkout-progress-connector.completed {
+  3991→  background: var(--mustard);
+  3992→}
+  3993→
+  3994→/* ---- STEP CONTAINER ---- */
+  3995→.checkout-step {
+  3996→  background: var(--card-bg);
+  3997→  border: 1px solid var(--border-color);
+  3998→  border-radius: 14px;
+  3999→  padding: 28px 24px;
+  4000→  box-shadow: 0 4px 16px rgba(122, 12, 12, 0.06);
+  4001→  margin-bottom: 20px;
+  4002→}
+  4003→
+  4004→.checkout-step-title {
+  4005→  font-family: var(--font-playfair), 'Playfair Display', serif;
+  4006→  font-size: 1.4rem;
+  4007→  color: var(--dark-red);
+  4008→  margin-bottom: 6px;
+  4009→}
+  4010→
+  4011→.checkout-step-subtitle {
+  4012→  color: var(--text-muted);
+  4013→  font-size: 0.9rem;
+  4014→  margin-bottom: 22px;
+  4015→}
+  4016→
+  4017→/* ---- STEP 1: REVIEW PLATE ---- */
+  4018→.checkout-cart-list {
+  4019→  display: flex;
+  4020→  flex-direction: column;
+  4021→  gap: 12px;
+  4022→  margin-bottom: 20px;
+  4023→}
+  4024→
+  4025→.checkout-cart-line {
+  4026→  display: flex;
+  4027→  align-items: center;
+  4028→  gap: 14px;
+  4029→  padding: 14px 16px;
+
+[showing lines 2030-4029 of 6848; use offset=4030 with limit to continue reading]

@@ -187,7 +187,8 @@ interface RawOrderRow {
   created_at: string
   updated_at: string
   order_items?: RawOrderItemRow[]
-  branchs?: { name: string; slug: string; city: string } | null
+  /** Joined from branches table. Key derived by PostgREST from FK column 'branch_id' → 'branch' */
+  branch?: { name: string; slug: string; city: string } | null
 }
 
 interface RawOrderItemRow {
@@ -210,6 +211,7 @@ interface RawOrderItemRow {
 
 interface RawProfileRow {
   id: string
+  auth_user_id: string
   full_name: string | null
   whatsapp_number: string | null
   mobile_number: string | null
@@ -463,15 +465,17 @@ export async function listOrdersByStatus(
     }
 
     // Fetch customer profiles for all orders
+    // CRITICAL: profiles.id ≠ auth.users.id. The FK is profiles.auth_user_id → auth.users(id).
+    // orders.user_id references auth.users(id), so we must match on auth_user_id.
     const userIds = [...new Set(orders.map((o: RawOrderRow) => o.user_id))]
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, full_name, whatsapp_number, mobile_number')
-      .in('id', userIds)
+      .select('id, auth_user_id, full_name, whatsapp_number, mobile_number')
+      .in('auth_user_id', userIds)
 
     const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
     for (const p of (profiles || []) as RawProfileRow[]) {
-      profileMap.set(p.id, {
+      profileMap.set(p.auth_user_id, {
         name: p.full_name || 'Customer',
         whatsappNumber: p.whatsapp_number || null,
         mobileNumber: p.mobile_number || null,
@@ -505,8 +509,8 @@ export async function listOrdersByStatus(
     // Map to typed response with proper snake_case -> camelCase conversion
     const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
       const profile = profileMap.get(o.user_id)
-      // Supabase returns the joined table as singular 'branchs' (from 'branches')
-      const branch = o.branchs as { name: string; slug: string; city: string } | null
+      // PostgREST derives the embedded key from the FK column: branch_id → 'branch'
+      const branch = o.branch as { name: string; slug: string; city: string } | null
       return {
         ...mapOrderRow(o),
         items: (o.order_items || []).map(mapOrderItemRow),
@@ -683,15 +687,16 @@ export async function listOngoingOrders(options?: {
     const rawOrders = orders as RawOrderRow[]
 
     // --- Batch fetch customer profiles ---
+    // CRITICAL: profiles.id ≠ auth.users.id. Must join on auth_user_id.
     const userIds = [...new Set(rawOrders.map((o) => o.user_id))]
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, full_name, whatsapp_number, mobile_number')
-      .in('id', userIds)
+      .select('id, auth_user_id, full_name, whatsapp_number, mobile_number')
+      .in('auth_user_id', userIds)
 
     const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
     for (const p of (profiles || []) as RawProfileRow[]) {
-      profileMap.set(p.id, {
+      profileMap.set(p.auth_user_id, {
         name: p.full_name || 'Customer',
         whatsappNumber: p.whatsapp_number || null,
         mobileNumber: p.mobile_number || null,
@@ -735,7 +740,8 @@ export async function listOngoingOrders(options?: {
     // --- Map to typed response ---
     const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
       const profile = profileMap.get(o.user_id)
-      const branch = o.branchs as { name: string; slug: string; city: string } | null
+      // PostgREST derives the embedded key from the FK column: branch_id → 'branch'
+      const branch = o.branch as { name: string; slug: string; city: string } | null
       return {
         ...mapOrderRow(o),
         items: (o.order_items || []).map(mapOrderItemRow),

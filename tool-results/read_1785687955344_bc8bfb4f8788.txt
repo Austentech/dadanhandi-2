@@ -1,0 +1,932 @@
+     1→     1→/**
+     2→     2→ * Admin Order Service
+     3→     3→ * Handles admin-side order operations: listing, status transitions, stats.
+     4→     4→ * All database access uses the service_role client to bypass RLS.
+     5→     5→ *
+     6→     6→ * Phase 3 Module 3: Integrated preparation window scheduling.
+     7→     7→ * - Dashboard "Pending" = confirmed + paid + in preparation window
+     8→     8→ * - Dashboard "Upcoming" = confirmed + paid + today + AFTER preparation window
+     9→     9→ * - New Orders list only shows orders within the preparation window
+    10→    10→ */
+    11→    11→
+    12→    12→import { createAdminClient } from '@/lib/supabase/client-admin'
+    13→    13→import type { DashboardStats } from '@/store/admin-store'
+    14→    14→import { getPreparationWindowBounds } from './admin-scheduling-service'
+    15→    15→
+    16→    16→// ============================================================================
+    17→    17→// TYPES
+    18→    18→// ============================================================================
+    19→    19→
+    20→    20→/** Order statuses relevant to admin operations */
+    21→    21→export type AdminOrderStatus =
+    22→    22→  | 'confirmed'        // paid, awaiting admin acceptance
+    23→    23→  | 'accepted'         // admin accepted, kitchen starts
+    24→    24→  | 'preparing'        // kitchen is cooking
+    25→    25→  | 'ready_for_pickup' // food ready, customer can collect
+    26→    26→  | 'completed'        // picked up / done
+    27→    27→  | 'cancelled'        // cancelled
+    28→    28→  | 'failed'           // payment failed
+    29→    29→
+    30→    30→/** Valid status transitions (from -> allowed to[]) */
+    31→    31→const VALID_TRANSITIONS: Record<string, AdminOrderStatus[]> = {
+    32→    32→  confirmed: ['accepted', 'cancelled'],
+    33→    33→  accepted: ['preparing', 'cancelled'],
+    34→    34→  preparing: ['ready_for_pickup', 'cancelled'],
+    35→    35→  ready_for_pickup: ['completed', 'cancelled'],
+    36→    36→  completed: [],
+    37→    37→  cancelled: [],
+    38→    38→  failed: [],
+    39→    39→}
+    40→    40→
+    41→    41→// ============================================================================
+    42→    42→// DASHBOARD STATS
+    43→    43→// ============================================================================
+    44→    44→
+    45→    45→export interface DashboardStatsResult {
+    46→    46→  success: boolean
+    47→    47→  stats: DashboardStats
+    48→    48→  error?: string
+    49→    49→}
+    50→    50→
+    51→    51→/**
+    52→    52→ * Fetch dashboard statistics from the database.
+    53→    53→ * Returns counts for each order status category.
+    54→    54→ *
+    55→    55→ * IMPORTANT: "Pending" and "Upcoming" now use the preparation window.
+    56→    56→ *   - Pending (Current Queue): confirmed + paid + pickup slot within window
+    57→    57→ *   - Upcoming: confirmed + paid + today + pickup slot AFTER window
+    58→    58→ */
+    59→    59→export async function getDashboardStats(): Promise<DashboardStatsResult> {
+    60→    60→  try {
+    61→    61→    const supabase = createAdminClient()
+    62→    62→    const bounds = getPreparationWindowBounds()
+    63→    63→
+    64→    64→    // Get today's date range in IST
+    65→    65→    const now = new Date()
+    66→    66→    const istOffset = 5.5 * 60 * 60 * 1000
+    67→    67→    const istTime = new Date(now.getTime() + istOffset)
+    68→    68→    const todayStart = new Date(istTime.getFullYear(), istTime.getMonth(), istTime.getDate())
+    69→    69→    const todayStartUTC = new Date(todayStart.getTime() - istOffset)
+    70→    70→
+    71→    71→    const [todayRes, acceptedRes, preparingRes, readyRes, completedRes, cancelledRes] =
+    72→    72→      await Promise.all([
+    73→    73→        // Today's orders (all non-draft statuses)
+    74→    74→        supabase.from('orders').select('id', { count: 'exact', head: true })
+    75→    75→          .neq('order_status', 'draft')
+    76→    76→          .gte('created_at', todayStartUTC.toISOString()),
+    77→    77→        // Accepted
+    78→    78→        supabase.from('orders').select('id', { count: 'exact', head: true })
+    79→    79→          .eq('order_status', 'accepted'),
+    80→    80→        // Preparing
+    81→    81→        supabase.from('orders').select('id', { count: 'exact', head: true })
+    82→    82→          .eq('order_status', 'preparing'),
+    83→    83→        // Ready for pickup
+    84→    84→        supabase.from('orders').select('id', { count: 'exact', head: true })
+    85→    85→          .eq('order_status', 'ready_for_pickup'),
+    86→    86→        // Completed (today)
+    87→    87→        supabase.from('orders').select('id', { count: 'exact', head: true })
+    88→    88→          .eq('order_status', 'completed')
+    89→    89→          .gte('created_at', todayStartUTC.toISOString()),
+    90→    90→        // Cancelled (today)
+    91→    91→        supabase.from('orders').select('id', { count: 'exact', head: true })
+    92→    92→          .eq('order_status', 'cancelled')
+    93→    93→          .gte('created_at', todayStartUTC.toISOString()),
+    94→    94→      ])
+    95→    95→
+    96→    96→    // --- Pending (Current Queue): confirmed + paid + in preparation window + overdue ---
+    97→    97→    // Includes: orders in window + overdue (slot passed) + past-date unaccepted
+    98→    98→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    99→    99→    const sb = supabase as any
+   100→   100→
+   101→   101→    const windowEndStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
+   102→   102→
+   103→   103→    // Pending today: in-window + overdue (slot <= windowEnd, no lower bound)
+   104→   104→    const { count: pendingTodayCount } = await sb
+   105→   105→      .from('orders')
+   106→   106→      .select('id', { count: 'exact', head: true })
+   107→   107→      .eq('order_status', 'confirmed')
+   108→   108→      .eq('payment_status', 'succeeded')
+   109→   109→      .eq('pickup_date', bounds.todayDateStr)
+   110→   110→      .lte('pickup_slot_start', windowEndStr)
+   111→   111→
+   112→   112→    // Pending past: overdue from yesterday or earlier
+   113→   113→    const { count: pendingPastCount } = await sb
+   114→   114→      .from('orders')
+   115→   115→      .select('id', { count: 'exact', head: true })
+   116→   116→      .eq('order_status', 'confirmed')
+   117→   117→      .eq('payment_status', 'succeeded')
+   118→   118→      .lt('pickup_date', bounds.todayDateStr)
+   119→   119→
+   120→   120→    const pendingCount = (pendingTodayCount || 0) + (pendingPastCount || 0)
+   121→   121→
+   122→   122→    // --- Upcoming: confirmed + paid + today + AFTER preparation window ---
+   123→   123→    const { count: upcomingCount } = await sb
+   124→   124→      .from('orders')
+   125→   125→      .select('id', { count: 'exact', head: true })
+   126→   126→      .eq('order_status', 'confirmed')
+   127→   127→      .eq('payment_status', 'succeeded')
+   128→   128→      .eq('pickup_date', bounds.todayDateStr)
+   129→   129→      .gt('pickup_slot_start', windowEndStr)
+   130→   130→
+   131→   131→    return {
+   132→   132→      success: true,
+   133→   133→      stats: {
+   134→   134→        todayOrders: todayRes.count || 0,
+   135→   135→        pendingOrders: pendingCount || 0,
+   136→   136→        acceptedOrders: acceptedRes.count || 0,
+   137→   137→        preparingOrders: preparingRes.count || 0,
+   138→   138→        readyOrders: readyRes.count || 0,
+   139→   139→        completedOrders: completedRes.count || 0,
+   140→   140→        cancelledOrders: cancelledRes.count || 0,
+   141→   141→        upcomingOrders: upcomingCount || 0,
+   142→   142→      },
+   143→   143→    }
+   144→   144→  } catch (err) {
+   145→   145→    console.error('[ADMIN ORDER SERVICE] getDashboardStats error:', err)
+   146→   146→    return { success: false, stats: emptyStats() }
+   147→   147→  }
+   148→   148→}
+   149→   149→
+   150→   150→function emptyStats(): DashboardStats {
+   151→   151→  return {
+   152→   152→    todayOrders: 0,
+   153→   153→    pendingOrders: 0,
+   154→   154→    acceptedOrders: 0,
+   155→   155→    preparingOrders: 0,
+   156→   156→    readyOrders: 0,
+   157→   157→    completedOrders: 0,
+   158→   158→    cancelledOrders: 0,
+   159→   159→    upcomingOrders: 0,
+   160→   160→  }
+   161→   161→}
+   162→   162→
+   163→   163→// ============================================================================
+   164→   164→// RAW DATABASE ROW TYPES (snake_case from Supabase)
+   165→   165→// ============================================================================
+   166→   166→
+   167→   167→interface RawOrderRow {
+   168→   168→  id: string
+   169→   169→  order_number: string
+   170→   170→  user_id: string
+   171→   171→  branch_id: string
+   172→   172→  pickup_date: string
+   173→   173→  pickup_slot_start: string
+   174→   174→  pickup_slot_end: string
+   175→   175→  subtotal_paise: number
+   176→   176→  donation_plantation_paise: number
+   177→   177→  donation_hunger_paise: number
+   178→   178→  reward_points_redeemed: number
+   179→   179→  reward_discount_paise: number
+   180→   180→  final_amount_paise: number
+   181→   181→  reward_points_earned: number
+   182→   182→  payment_status: string
+   183→   183→  order_status: string
+   184→   184→  payment_method: string | null
+   185→   185→  razorpay_order_id: string | null
+   186→   186→  customer_notes: string | null
+   187→   187→  created_at: string
+   188→   188→  updated_at: string
+   189→   189→  order_items?: RawOrderItemRow[]
+   190→   190→  branchs?: { name: string; slug: string; city: string } | null
+   191→   191→}
+   192→   192→
+   193→   193→interface RawOrderItemRow {
+   194→   194→  id: string
+   195→   195→  order_id: string
+   196→   196→  line_key: string
+   197→   197→  item_id: string
+   198→   198→  variant_id: string
+   199→   199→  item_name: string
+   200→   200→  item_emoji: string
+   201→   201→  item_type: string
+   202→   202→  variant_label: string
+   203→   203→  weight_grams: number | null
+   204→   204→  piece_count: number | null
+   205→   205→  unit_price_paise: number
+   206→   206→  quantity: number
+   207→   207→  line_total_paise: number
+   208→   208→  created_at: string
+   209→   209→}
+   210→   210→
+   211→   211→interface RawProfileRow {
+   212→   212→  id: string
+   213→   213→  full_name: string | null
+   214→   214→  whatsapp_number: string | null
+   215→   215→  mobile_number: string | null
+   216→   216→}
+   217→   217→
+   218→   218→// ============================================================================
+   219→   219→// MAPPED (camelCase) TYPES — used by frontend
+   220→   220→// ============================================================================
+   221→   221→
+   222→   222→export interface AdminOrderItem {
+   223→   223→  id: string
+   224→   224→  orderNumber: string
+   225→   225→  userId: string
+   226→   226→  branchId: string
+   227→   227→  pickupDate: string
+   228→   228→  pickupSlotStart: string
+   229→   229→  pickupSlotEnd: string
+   230→   230→  subtotalPaise: number
+   231→   231→  donationPlantationPaise: number
+   232→   232→  donationHungerPaise: number
+   233→   233→  rewardPointsRedeemed: number
+   234→   234→  rewardDiscountPaise: number
+   235→   235→  finalAmountPaise: number
+   236→   236→  rewardPointsEarned: number
+   237→   237→  paymentStatus: string
+   238→   238→  paymentMethod: string | null
+   239→   239→  orderStatus: string
+   240→   240→  razorpayOrderId: string | null
+   241→   241→  customerNotes: string | null
+   242→   242→  createdAt: string
+   243→   243→  updatedAt: string
+   244→   244→}
+   245→   245→
+   246→   246→export interface AdminOrderItemDetail {
+   247→   247→  lineKey: string
+   248→   248→  itemName: string
+   249→   249→  itemEmoji: string
+   250→   250→  variantLabel: string
+   251→   251→  weightGrams: number | null
+   252→   252→  pieceCount: number | null
+   253→   253→  unitPricePaise: number
+   254→   254→  quantity: number
+   255→   255→  lineTotalPaise: number
+   256→   256→}
+   257→   257→
+   258→   258→export interface AdminOrderWithItems extends AdminOrderItem {
+   259→   259→  items: AdminOrderItemDetail[]
+   260→   260→  branch?: {
+   261→   261→    name: string
+   262→   262→    slug: string
+   263→   263→    city: string
+   264→   264→  } | null
+   265→   265→  customer?: {
+   266→   266→    name: string
+   267→   267→    whatsappNumber: string | null
+   268→   268→    mobileNumber: string | null
+   269→   269→  } | null
+   270→   270→  /**
+   271→   271→   * True if the pickup slot has already passed but the order
+   272→   272→   * was never accepted by admin. Computed server-side.
+   273→   273→   */
+   274→   274→  isOverdue?: boolean
+   275→   275→  /**
+   276→   276→   * ISO timestamp when the order was accepted (from order_status_history).
+   277→   277→   * Populated for ongoing orders.
+   278→   278→   */
+   279→   279→  acceptedAt?: string
+   280→   280→}
+   281→   281→
+   282→   282→export interface ListOrdersResult {
+   283→   283→  success: boolean
+   284→   284→  orders: AdminOrderWithItems[]
+   285→   285→  totalCount: number
+   286→   286→  error?: string
+   287→   287→}
+   288→   288→
+   289→   289→// ============================================================================
+   290→   290→// MAPPING HELPERS
+   291→   291→// ============================================================================
+   292→   292→
+   293→   293→/** Map a raw DB order row (snake_case) to camelCase AdminOrderItem */
+   294→   294→function mapOrderRow(raw: RawOrderRow): AdminOrderItem {
+   295→   295→  return {
+   296→   296→    id: raw.id,
+   297→   297→    orderNumber: raw.order_number,
+   298→   298→    userId: raw.user_id,
+   299→   299→    branchId: raw.branch_id,
+   300→   300→    pickupDate: raw.pickup_date,
+   301→   301→    pickupSlotStart: raw.pickup_slot_start,
+   302→   302→    pickupSlotEnd: raw.pickup_slot_end,
+   303→   303→    subtotalPaise: raw.subtotal_paise,
+   304→   304→    donationPlantationPaise: raw.donation_plantation_paise,
+   305→   305→    donationHungerPaise: raw.donation_hunger_paise,
+   306→   306→    rewardPointsRedeemed: raw.reward_points_redeemed,
+   307→   307→    rewardDiscountPaise: raw.reward_discount_paise,
+   308→   308→    finalAmountPaise: raw.final_amount_paise,
+   309→   309→    rewardPointsEarned: raw.reward_points_earned,
+   310→   310→    paymentStatus: raw.payment_status,
+   311→   311→    paymentMethod: raw.payment_method,
+   312→   312→    orderStatus: raw.order_status,
+   313→   313→    razorpayOrderId: raw.razorpay_order_id,
+   314→   314→    customerNotes: raw.customer_notes,
+   315→   315→    createdAt: raw.created_at,
+   316→   316→    updatedAt: raw.updated_at,
+   317→   317→  }
+   318→   318→}
+   319→   319→
+   320→   320→/** Map a raw DB order_item row (snake_case) to camelCase AdminOrderItemDetail */
+   321→   321→function mapOrderItemRow(raw: RawOrderItemRow): AdminOrderItemDetail {
+   322→   322→  return {
+   323→   323→    lineKey: raw.line_key,
+   324→   324→    itemName: raw.item_name,
+   325→   325→    itemEmoji: raw.item_emoji,
+   326→   326→    variantLabel: raw.variant_label,
+   327→   327→    weightGrams: raw.weight_grams,
+   328→   328→    pieceCount: raw.piece_count,
+   329→   329→    unitPricePaise: raw.unit_price_paise,
+   330→   330→    quantity: raw.quantity,
+   331→   331→    lineTotalPaise: raw.line_total_paise,
+   332→   332→  }
+   333→   333→}
+   334→   334→
+   335→   335→// ============================================================================
+   336→   336→// LIST ORDERS
+   337→   337→// ============================================================================
+   338→   338→
+   339→   339→/**
+   340→   340→ * List orders with a given status, including items and customer info.
+   341→   341→ * For 'confirmed' status:
+   342→   342→ *   - Only shows PAID orders (payment_status='succeeded')
+   343→   343→ *   - Shows orders in the preparation window (current queue)
+   344→   344→ *   - Shows OVERDUE orders whose pickup slot has already passed (never accepted)
+   345→   345→ *   - Shows past-date orders (yesterday or earlier, still confirmed + paid)
+   346→   346→ *   - Orders with FUTURE pickup slots are HIDDEN until their window begins
+   347→   347→ *   - Each order includes an `isOverdue` flag computed server-side
+   348→   348→ */
+   349→   349→export async function listOrdersByStatus(
+   350→   350→  status: AdminOrderStatus,
+   351→   351→  options?: {
+   352→   352→    branchSlug?: string
+   353→   353→    search?: string
+   354→   354→    limit?: number
+   355→   355→    offset?: number
+   356→   356→  }
+   357→   357→): Promise<ListOrdersResult> {
+   358→   358→  try {
+   359→   359→    const supabase = createAdminClient()
+   360→   360→    const limit = options?.limit || 50
+   361→   361→    const offset = options?.offset || 0
+   362→   362→
+   363→   363→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   364→   364→    const sb = supabase as any
+   365→   365→
+   366→   366→    const selectFields = `
+   367→   367→      *,
+   368→   368→      order_items (*),
+   369→   369→      branches (name, slug, city)
+   370→   370→    `
+   371→   371→
+   372→   372→    let orders: RawOrderRow[]
+   373→   373→    let totalCount: number
+   374→   374→    // Store window bounds for isOverdue computation (only for confirmed)
+   375→   375→    let windowStartMinutes: number | null = null
+   376→   376→    let todayDateStr: string | null = null
+   377→   377→
+   378→   378→    if (status === 'confirmed') {
+   379→   379→      // --- Confirmed orders: two-query approach ---
+   380→   380→      // 1. Today's orders: in-window + overdue (no lower bound on slot)
+   381→   381→      // 2. Past-date overdue: pickup_date < today
+   382→   382→      // Future orders (slot after window end) are excluded.
+   383→   383→
+   384→   384→      const bounds = getPreparationWindowBounds()
+   385→   385→      windowStartMinutes = bounds.windowStartMinutes
+   386→   386→      todayDateStr = bounds.todayDateStr
+   387→   387→
+   388→   388→      const windowEndStr = `${String(Math.floor(bounds.windowEndMinutes / 60)).padStart(2, '0')}:${String(bounds.windowEndMinutes % 60).padStart(2, '0')}:00`
+   389→   389→
+   390→   390→      // Query 1: Today — in-window + overdue (slot <= windowEnd, no .gte lower bound)
+   391→   391→      let todayQ = sb
+   392→   392→        .from('orders')
+   393→   393→        .select(selectFields, { count: 'exact' })
+   394→   394→        .eq('order_status', 'confirmed')
+   395→   395→        .eq('payment_status', 'succeeded')
+   396→   396→        .eq('pickup_date', bounds.todayDateStr)
+   397→   397→        .lte('pickup_slot_start', windowEndStr)
+   398→   398→        .order('pickup_slot_start', { ascending: true })
+   399→   399→
+   400→   400→      // Query 2: Past-date overdue (yesterday or earlier, never accepted)
+   401→   401→      let pastQ = sb
+   402→   402→        .from('orders')
+   403→   403→        .select(selectFields)
+   404→   404→        .eq('order_status', 'confirmed')
+   405→   405→        .eq('payment_status', 'succeeded')
+   406→   406→        .lt('pickup_date', bounds.todayDateStr)
+   407→   407→        .order('pickup_date', { ascending: false })
+   408→   408→        .order('pickup_slot_start', { ascending: false })
+   409→   409→        .limit(50) // Safety limit for very old overdue orders
+   410→   410→
+   411→   411→      // Apply optional branch filter to both queries
+   412→   412→      if (options?.branchSlug) {
+   413→   413→        todayQ = todayQ.eq('branch_id', options.branchSlug)
+   414→   414→        pastQ = pastQ.eq('branch_id', options.branchSlug)
+   415→   415→      }
+   416→   416→
+   417→   417→      const [todayRes, pastRes] = await Promise.all([todayQ, pastQ])
+   418→   418→
+   419→   419→      if (todayRes.error) {
+   420→   420→        console.error('[ADMIN ORDER SERVICE] listOrdersByStatus today query error:', todayRes.error)
+   421→   421→        return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch orders' }
+   422→   422→      }
+   423→   423→
+   424→   424→      const todayOrders = (todayRes.data || []) as RawOrderRow[]
+   425→   425→      const pastOrders = (pastRes.data || []) as RawOrderRow[]
+   426→   426→
+   427→   427→      // Merge: past overdue first (most recent past first), then today's
+   428→   428→      orders = [...pastOrders, ...todayOrders]
+   429→   429→      totalCount = (todayRes.count || 0) + pastOrders.length
+   430→   430→    } else {
+   431→   431→      // --- Non-confirmed: simple single query ---
+   432→   432→      let query = sb
+   433→   433→        .from('orders')
+   434→   434→        .select(selectFields, { count: 'exact' })
+   435→   435→        .eq('order_status', status)
+   436→   436→
+   437→   437→      query = query
+   438→   438→        .order('pickup_slot_start', { ascending: true })
+   439→   439→        .range(offset, offset + limit - 1)
+   440→   440→
+   441→   441→      if (options?.branchSlug) {
+   442→   442→        query = query.eq('branch_id', options.branchSlug)
+   443→   443→      }
+   444→   444→
+   445→   445→      const { data, error, count } = await query
+   446→   446→
+   447→   447→      if (error) {
+   448→   448→        console.error('[ADMIN ORDER SERVICE] listOrdersByStatus error:', error)
+   449→   449→        return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch orders' }
+   450→   450→      }
+   451→   451→
+   452→   452→      orders = (data || []) as RawOrderRow[]
+   453→   453→      totalCount = count || 0
+   454→   454→    }
+   455→   455→
+   456→   456→    // Apply pagination (for confirmed, we already have all orders merged)
+   457→   457→    if (status === 'confirmed') {
+   458→   458→      orders = orders.slice(offset, offset + limit)
+   459→   459→    }
+   460→   460→
+   461→   461→    if (!orders || orders.length === 0) {
+   462→   462→      return { success: true, orders: [], totalCount: 0 }
+   463→   463→    }
+   464→   464→
+   465→   465→    // Fetch customer profiles for all orders
+   466→   466→    const userIds = [...new Set(orders.map((o: RawOrderRow) => o.user_id))]
+   467→   467→    const { data: profiles } = await supabase
+   468→   468→      .from('profiles')
+   469→   469→      .select('id, full_name, whatsapp_number, mobile_number')
+   470→   470→      .in('id', userIds)
+   471→   471→
+   472→   472→    const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
+   473→   473→    for (const p of (profiles || []) as RawProfileRow[]) {
+   474→   474→      profileMap.set(p.id, {
+   475→   475→        name: p.full_name || 'Customer',
+   476→   476→        whatsappNumber: p.whatsapp_number || null,
+   477→   477→        mobileNumber: p.mobile_number || null,
+   478→   478→      })
+   479→   479→    }
+   480→   480→
+   481→   481→    // Search filter (applied in-memory since Supabase free tier doesn't support full-text across joins)
+   482→   482→    let filteredOrders = orders as RawOrderRow[]
+   483→   483→    if (options?.search) {
+   484→   484→      const q = options.search.toLowerCase()
+   485→   485→      filteredOrders = filteredOrders.filter((o) => {
+   486→   486→        const orderNum = (o.order_number || '').toLowerCase()
+   487→   487→        const profile = profileMap.get(o.user_id)
+   488→   488→        const customerName = (profile?.name || '').toLowerCase()
+   489→   489→        return orderNum.includes(q) || customerName.includes(q)
+   490→   490→      })
+   491→   491→    }
+   492→   492→
+   493→   493→    // Helper: compute isOverdue for a confirmed order (server-side, using window bounds)
+   494→   494→    const computeIsOverdue = (raw: RawOrderRow): boolean => {
+   495→   495→      if (windowStartMinutes === null || todayDateStr === null) return false
+   496→   496→      // Past-date orders are always overdue
+   497→   497→      if (raw.pickup_date < todayDateStr) return true
+   498→   498→      // Today's orders: overdue if slot started before the window
+   499→   499→      const [h, m] = raw.pickup_slot_start.split(':').map(Number)
+   500→   500→      if (isNaN(h) || isNaN(m)) return false
+   501→   501→      const slotMinutes = h * 60 + m
+   502→   502→      return slotMinutes < windowStartMinutes
+   503→   503→    }
+   504→   504→
+   505→   505→    // Map to typed response with proper snake_case -> camelCase conversion
+   506→   506→    const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
+   507→   507→      const profile = profileMap.get(o.user_id)
+   508→   508→      // Supabase returns the joined table as singular 'branchs' (from 'branches')
+   509→   509→      const branch = o.branchs as { name: string; slug: string; city: string } | null
+   510→   510→      return {
+   511→   511→        ...mapOrderRow(o),
+   512→   512→        items: (o.order_items || []).map(mapOrderItemRow),
+   513→   513→        branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
+   514→   514→        customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
+   515→   515→        isOverdue: status === 'confirmed' ? computeIsOverdue(o) : undefined,
+   516→   516→      }
+   517→   517→    })
+   518→   518→
+   519→   519→    return {
+   520→   520→      success: true,
+   521→   521→      orders: mapped,
+   522→   522→      totalCount,
+   523→   523→    }
+   524→   524→  } catch (err) {
+   525→   525→    console.error('[ADMIN ORDER SERVICE] listOrdersByStatus error:', err)
+   526→   526→    return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch orders' }
+   527→   527→  }
+   528→   528→}
+   529→   529→
+   530→   530→// ============================================================================
+   531→   531→// ACCEPT ORDER
+   532→   532→// ============================================================================
+   533→   533→
+   534→   534→export interface AcceptOrderResult {
+   535→   535→  success: boolean
+   536→   536→  message: string
+   537→   537→  order?: AdminOrderWithItems
+   538→   538→  error?: string
+   539→   539→}
+   540→   540→
+   541→   541→/**
+   542→   542→ * Accept an order: transition from 'confirmed' to 'accepted'.
+   543→   543→ * - Validates order exists, is 'confirmed', and payment succeeded
+   544→   544→ * - Prevents duplicate acceptance (idempotent by design)
+   545→   545→ * - Records status change in order_status_history
+   546→   546→ */
+   547→   547→export async function acceptOrder(
+   548→   548→  orderId: string,
+   549→   549→  adminUserId: string
+   550→   550→): Promise<AcceptOrderResult> {
+   551→   551→  try {
+   552→   552→    const supabase = createAdminClient()
+   553→   553→
+   554→   554→    // 1. Validate input
+   555→   555→    if (!orderId || typeof orderId !== 'string') {
+   556→   556→      return { success: false, message: 'Invalid order ID' }
+   557→   557→    }
+   558→   558→
+   559→   559→    // 2. Fetch the order
+   560→   560→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   561→   561→    const { data: order, error: fetchErr }: { data: RawOrderRow | null; error: any } = await supabase
+   562→   562→      .from('orders')
+   563→   563→      .select('*')
+   564→   564→      .eq('id', orderId)
+   565→   565→      .single()
+   566→   566→
+   567→   567→    if (fetchErr || !order) {
+   568→   568→      return { success: false, message: 'Order not found' }
+   569→   569→    }
+   570→   570→
+   571→   571→    // 3. Validate payment status — must be succeeded
+   572→   572→    if (order.payment_status !== 'succeeded') {
+   573→   573→      return { success: false, message: 'Cannot accept an unpaid order' }
+   574→   574→    }
+   575→   575→
+   576→   576→    // 4. Validate current status
+   577→   577→    if (order.order_status !== 'confirmed') {
+   578→   578→      if (order.order_status === 'accepted') {
+   579→   579→        return { success: true, message: 'Order already accepted' }
+   580→   580→      }
+   581→   581→      return { success: false, message: `Cannot accept order in '${order.order_status}' status` }
+   582→   582→    }
+   583→   583→
+   584→   584→    // 5. Validate the transition is allowed
+   585→   585→    const allowedTransitions = VALID_TRANSITIONS[order.order_status] || []
+   586→   586→    if (!allowedTransitions.includes('accepted')) {
+   587→   587→      return { success: false, message: 'Invalid status transition' }
+   588→   588→    }
+   589→   589→
+   590→   590→    // 6. Update order status (race condition guard: only update if still confirmed)
+   591→   591→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   592→   592→    const sb = supabase as any
+   593→   593→    const { error: updateErr } = await sb
+   594→   594→      .from('orders')
+   595→   595→      .update({
+   596→   596→        order_status: 'accepted',
+   597→   597→        updated_at: new Date().toISOString(),
+   598→   598→      })
+   599→   599→      .eq('id', orderId)
+   600→   600→      .eq('order_status', 'confirmed')
+   601→   601→
+   602→   602→    if (updateErr) {
+   603→   603→      console.error('[ADMIN ORDER SERVICE] acceptOrder update error:', updateErr)
+   604→   604→      return { success: false, message: 'Failed to update order. Please try again.' }
+   605→   605→    }
+   606→   606→
+   607→   607→    // 7. Log status change in history
+   608→   608→    //    Table schema: (order_id, status, note, created_at)
+   609→   609→    //    Unique constraint: (order_id, status) — one row per status per order
+   610→   610→    try {
+   611→   611→      const { error: histErr } = await sb.from('order_status_history').insert({
+   612→   612→        order_id: orderId,
+   613→   613→        status: 'accepted',
+   614→   614→        note: 'Accepted by admin',
+   615→   615→      })
+   616→   616→      // Ignore duplicate key errors (order already has 'accepted' status row)
+   617→   617→      if (histErr && !String(histErr.message || histErr).includes('duplicate')) {
+   618→   618→        console.error('[ADMIN ORDER SERVICE] Failed to log status history:', histErr)
+   619→   619→      }
+   620→   620→    } catch (historyErr) {
+   621→   621→      // Log but don't fail — the order status was already updated
+   622→   622→      console.error('[ADMIN ORDER SERVICE] Failed to log status history:', historyErr)
+   623→   623→    }
+   624→   624→
+   625→   625→    return { success: true, message: 'Order accepted successfully' }
+   626→   626→  } catch (err) {
+   627→   627→    console.error('[ADMIN ORDER SERVICE] acceptOrder error:', err)
+   628→   628→    return { success: false, message: 'Something went wrong. Please try again.' }
+   629→   629→  }
+   630→   630→}
+   631→   631→
+   632→   632→// ============================================================================
+   633→   633→// LIST ONGOING ORDERS
+   634→   634→// ============================================================================
+   635→   635→
+   636→   636→/**
+   637→   637→ * List all ongoing orders (accepted, preparing, ready_for_pickup).
+   638→   638→ * Includes items, customer info, branch info, and accepted-at timestamp.
+   639→   639→ * Ordered by pickup time (soonest first), then by status priority.
+   640→   640→ */
+   641→   641→export async function listOngoingOrders(options?: {
+   642→   642→  branchSlug?: string
+   643→   643→  search?: string
+   644→   644→  limit?: number
+   645→   645→  offset?: number
+   646→   646→}): Promise<ListOrdersResult> {
+   647→   647→  try {
+   648→   648→    const supabase = createAdminClient()
+   649→   649→    const limit = options?.limit || 50
+   650→   650→    const offset = options?.offset || 0
+   651→   651→
+   652→   652→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   653→   653→    const sb = supabase as any
+   654→   654→
+   655→   655→    const selectFields = `
+   656→   656→      *,
+   657→   657→      order_items (*),
+   658→   658→      branches (name, slug, city)
+   659→   659→    `
+   660→   660→
+   661→   661→    let query = sb
+   662→   662→      .from('orders')
+   663→   663→      .select(selectFields, { count: 'exact' })
+   664→   664→      .in('order_status', ['accepted', 'preparing', 'ready_for_pickup'])
+   665→   665→      .order('pickup_slot_start', { ascending: true })
+   666→   666→      .range(offset, offset + limit - 1)
+   667→   667→
+   668→   668→    if (options?.branchSlug) {
+   669→   669→      query = query.eq('branch_id', options.branchSlug)
+   670→   670→    }
+   671→   671→
+   672→   672→    const { data: orders, error, count } = await query
+   673→   673→
+   674→   674→    if (error) {
+   675→   675→      console.error('[ADMIN ORDER SERVICE] listOngoingOrders error:', error)
+   676→   676→      return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch ongoing orders' }
+   677→   677→    }
+   678→   678→
+   679→   679→    if (!orders || orders.length === 0) {
+   680→   680→      return { success: true, orders: [], totalCount: 0 }
+   681→   681→    }
+   682→   682→
+   683→   683→    const rawOrders = orders as RawOrderRow[]
+   684→   684→
+   685→   685→    // --- Batch fetch customer profiles ---
+   686→   686→    const userIds = [...new Set(rawOrders.map((o) => o.user_id))]
+   687→   687→    const { data: profiles } = await supabase
+   688→   688→      .from('profiles')
+   689→   689→      .select('id, full_name, whatsapp_number, mobile_number')
+   690→   690→      .in('id', userIds)
+   691→   691→
+   692→   692→    const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
+   693→   693→    for (const p of (profiles || []) as RawProfileRow[]) {
+   694→   694→      profileMap.set(p.id, {
+   695→   695→        name: p.full_name || 'Customer',
+   696→   696→        whatsappNumber: p.whatsapp_number || null,
+   697→   697→        mobileNumber: p.mobile_number || null,
+   698→   698→      })
+   699→   699→    }
+   700→   700→
+   701→   701→    // --- Batch fetch accepted-at timestamps from status history ---
+   702→   702→    const orderIds = rawOrders.map((o) => o.id)
+   703→   703→    const { data: historyRows } = await supabase
+   704→   704→      .from('order_status_history')
+   705→   705→      .select('order_id, created_at')
+   706→   706→      .in('order_id', orderIds)
+   707→   707→      .eq('status', 'accepted')
+   708→   708→
+   709→   709→    const acceptedAtMap = new Map<string, string>()
+   710→   710→    for (const row of (historyRows || []) as { order_id: string; created_at: string }[]) {
+   711→   711→      if (!acceptedAtMap.has(row.order_id)) {
+   712→   712→        acceptedAtMap.set(row.order_id, row.created_at)
+   713→   713→      }
+   714→   714→    }
+   715→   715→
+   716→   716→    // --- Search filter (in-memory) ---
+   717→   717→    let filteredOrders = rawOrders
+   718→   718→    if (options?.search) {
+   719→   719→      const q = options.search.toLowerCase()
+   720→   720→      filteredOrders = filteredOrders.filter((o) => {
+   721→   721→        const orderNum = (o.order_number || '').toLowerCase()
+   722→   722→        const profile = profileMap.get(o.user_id)
+   723→   723→        const customerName = (profile?.name || '').toLowerCase()
+   724→   724→        return orderNum.includes(q) || customerName.includes(q)
+   725→   725→      })
+   726→   726→    }
+   727→   727→
+   728→   728→    // --- Status priority for sorting (accepted=1, preparing=2, ready=3) ---
+   729→   729→    const statusWeight: Record<string, number> = {
+   730→   730→      accepted: 1,
+   731→   731→      preparing: 2,
+   732→   732→      ready_for_pickup: 3,
+   733→   733→    }
+   734→   734→
+   735→   735→    // --- Map to typed response ---
+   736→   736→    const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
+   737→   737→      const profile = profileMap.get(o.user_id)
+   738→   738→      const branch = o.branchs as { name: string; slug: string; city: string } | null
+   739→   739→      return {
+   740→   740→        ...mapOrderRow(o),
+   741→   741→        items: (o.order_items || []).map(mapOrderItemRow),
+   742→   742→        branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
+   743→   743→        customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
+   744→   744→        acceptedAt: acceptedAtMap.get(o.id) || undefined,
+   745→   745→      }
+   746→   746→    })
+   747→   747→
+   748→   748→    // Sort: pickup time ascending, then status weight ascending (accepted before preparing)
+   749→   749→    mapped.sort((a, b) => {
+   750→   750→      const slotA = a.pickupSlotStart
+   751→   751→      const slotB = b.pickupSlotStart
+   752→   752→      if (slotA !== slotB) return slotA.localeCompare(slotB)
+   753→   753→      return (statusWeight[a.orderStatus] || 99) - (statusWeight[b.orderStatus] || 99)
+   754→   754→    })
+   755→   755→
+   756→   756→    return {
+   757→   757→      success: true,
+   758→   758→      orders: mapped,
+   759→   759→      totalCount: count || 0,
+   760→   760→    }
+   761→   761→  } catch (err) {
+   762→   762→    console.error('[ADMIN ORDER SERVICE] listOngoingOrders error:', err)
+   763→   763→    return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch ongoing orders' }
+   764→   764→  }
+   765→   765→}
+   766→   766→
+   767→   767→// ============================================================================
+   768→   768→// UPDATE ORDER STATUS (Kitchen Workflow)
+   769→   769→// ============================================================================
+   770→   770→
+   771→   771→export interface UpdateOrderStatusResult {
+   772→   772→  success: boolean
+   773→   773→  message: string
+   774→   774→  error?: string
+   775→   775→}
+   776→   776→
+   777→   777→/**
+   778→   778→ * Subset of VALID_TRANSITIONS for the kitchen workflow.
+   779→   779→ * This module only handles forward transitions:
+   780→   780→ *   accepted → preparing → ready_for_pickup
+   781→   781→ * Cancellation and other transitions are handled by other modules.
+   782→   782→ */
+   783→   783→const KITCHEN_TRANSITIONS: Record<string, AdminOrderStatus[]> = {
+   784→   784→  accepted: ['preparing'],
+   785→   785→  preparing: ['ready_for_pickup'],
+   786→   786→}
+   787→   787→
+   788→   788→/**
+   789→   789→ * Update an order's status as part of the kitchen workflow.
+   790→   790→ * Handles: accepted → preparing, preparing → ready_for_pickup.
+   791→   791→ *
+   792→   792→ * Security:
+   793→   793→ * - Validates order exists and current DB status
+   794→   794→ * - Validates transition is allowed
+   795→   795→ * - Race condition guard: UPDATE only if order_status still equals current
+   796→   796→ * - Records full audit trail in order_status_history
+   797→   797→ *
+   798→   798→ * @param orderId - UUID of the order
+   799→   799→ * @param targetStatus - The new status to transition to
+   800→   800→ * @param adminUserId - UUID of the admin making the change
+   801→   801→ */
+   802→   802→export async function updateOrderStatus(
+   803→   803→  orderId: string,
+   804→   804→  targetStatus: AdminOrderStatus,
+   805→   805→  adminUserId: string
+   806→   806→): Promise<UpdateOrderStatusResult> {
+   807→   807→  try {
+   808→   808→    const supabase = createAdminClient()
+   809→   809→
+   810→   810→    // 1. Validate inputs
+   811→   811→    if (!orderId || typeof orderId !== 'string') {
+   812→   812→      return { success: false, message: 'Invalid order ID' }
+   813→   813→    }
+   814→   814→    if (!targetStatus || typeof targetStatus !== 'string') {
+   815→   815→      return { success: false, message: 'Invalid target status' }
+   816→   816→    }
+   817→   817→
+   818→   818→    // 2. Validate target status is allowed in kitchen workflow
+   819→   819→    const allowedTargets = Object.values(KITCHEN_TRANSITIONS).flat()
+   820→   820→    if (!allowedTargets.includes(targetStatus)) {
+   821→   821→      return { success: false, message: 'Invalid status transition for this workflow' }
+   822→   822→    }
+   823→   823→
+   824→   824→    // 3. Fetch the current order
+   825→   825→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   826→   826→    const { data: order, error: fetchErr }: { data: RawOrderRow | null; error: any } = await supabase
+   827→   827→      .from('orders')
+   828→   828→      .select('*')
+   829→   829→      .eq('id', orderId)
+   830→   830→      .single()
+   831→   831→
+   832→   832→    if (fetchErr || !order) {
+   833→   833→      return { success: false, message: 'Order not found' }
+   834→   834→    }
+   835→   835→
+   836→   836→    // 4. Determine what current status allows this transition
+   837→   837→    const currentStatus = order.order_status
+   838→   838→    const allowedFromCurrent = KITCHEN_TRANSITIONS[currentStatus]
+   839→   839→    if (!allowedFromCurrent || !allowedFromCurrent.includes(targetStatus)) {
+   840→   840→      // Provide a helpful message
+   841→   841→      const statusLabels: Record<string, string> = {
+   842→   842→        confirmed: 'Pending',
+   843→   843→        accepted: 'Accepted',
+   844→   844→        preparing: 'Preparing',
+   845→   845→        ready_for_pickup: 'Ready for Pickup',
+   846→   846→        completed: 'Completed',
+   847→   847→        cancelled: 'Cancelled',
+   848→   848→      }
+   849→   849→      const from = statusLabels[currentStatus] || currentStatus
+   850→   850→      const to = statusLabels[targetStatus] || targetStatus
+   851→   851→      return { success: false, message: `Cannot move order from "${from}" to "${to}"` }
+   852→   852→    }
+   853→   853→
+   854→   854→    // 5. Update with race condition guard (only update if status hasn't changed)
+   855→   855→    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   856→   856→    const sb = supabase as any
+   857→   857→    const { error: updateErr, count: updateCount } = await sb
+   858→   858→      .from('orders')
+   859→   859→      .update({
+   860→   860→        order_status: targetStatus,
+   861→   861→        updated_at: new Date().toISOString(),
+   862→   862→      })
+   863→   863→      .eq('id', orderId)
+   864→   864→      .eq('order_status', currentStatus)
+   865→   865→
+   866→   866→    if (updateErr) {
+   867→   867→      console.error('[ADMIN ORDER SERVICE] updateOrderStatus update error:', updateErr)
+   868→   868→      return { success: false, message: 'Failed to update order status. Please try again.' }
+   869→   869→    }
+   870→   870→
+   871→   871→    // 6. Check if the update actually happened (0 rows = race condition / already changed)
+   872→   872→    if (updateCount === 0) {
+   873→   873→      // Re-fetch to get current status for a helpful message
+   874→   874→      const { data: freshOrder } = await supabase
+   875→   875→        .from('orders')
+   876→   876→        .select('order_status')
+   877→   877→        .eq('id', orderId)
+   878→   878→        .single()
+   879→   879→
+   880→   880→      const statusLabels: Record<string, string> = {
+   881→   881→        accepted: 'Accepted', preparing: 'Preparing',
+   882→   882→        ready_for_pickup: 'Ready for Pickup', completed: 'Completed',
+   883→   883→        cancelled: 'Cancelled', confirmed: 'Pending',
+   884→   884→      }
+   885→   885→      const current = statusLabels[freshOrder?.order_status] || freshOrder?.order_status || 'Unknown'
+   886→   886→      return { success: false, message: `Order status was already updated to "${current}" by another action` }
+   887→   887→    }
+   888→   888→
+   889→   889→    // 7. Log status change in history
+   890→   890→    //    Table schema: (order_id, status, note, created_at)
+   891→   891→    //    Unique constraint: (order_id, status) — one row per status per order
+   892→   892→    //    Note encodes: previous → new | admin_id
+   893→   893→    const statusNote = `${currentStatus} → ${targetStatus} | admin: ${adminUserId}`
+   894→   894→    try {
+   895→   895→      const { error: histErr } = await sb.from('order_status_history').insert({
+   896→   896→        order_id: orderId,
+   897→   897→        status: targetStatus,
+   898→   898→        note: statusNote,
+   899→   899→      })
+   900→   900→      if (histErr && !String(histErr.message || histErr).includes('duplicate')) {
+   901→   901→        console.error('[ADMIN ORDER SERVICE] Failed to log status history:', histErr)
+   902→   902→      }
+   903→   903→    } catch (historyErr) {
+   904→   904→      console.error('[ADMIN ORDER SERVICE] Failed to log status history:', historyErr)
+   905→   905→    }
+   906→   906→
+   907→   907→    // 8. Success
+   908→   908→    const statusLabels: Record<string, string> = {
+   909→   909→      preparing: 'Preparing',
+   910→   910→      ready_for_pickup: 'Ready for Pickup',
+   911→   911→    }
+   912→   912→    const label = statusLabels[targetStatus] || targetStatus
+   913→   913→    return { success: true, message: `Order status updated to "${label}"` }
+   914→   914→  } catch (err) {
+   915→   915→    console.error('[ADMIN ORDER SERVICE] updateOrderStatus error:', err)
+   916→   916→    return { success: false, message: 'Something went wrong. Please try again.' }
+   917→   917→  }
+   918→   918→}
+   919→   919→
+   920→   920→// ============================================================================
+   921→   921→// VALIDATE STATUS TRANSITION (reusable)
+   922→   922→// ============================================================================
+   923→   923→
+   924→   924→export function isValidTransition(
+   925→   925→  currentStatus: string,
+   926→   926→  targetStatus: string
+   927→   927→): boolean {
+   928→   928→  const allowed = VALID_TRANSITIONS[currentStatus]
+   929→   929→  if (!allowed) return false
+   930→   930→  return allowed.includes(targetStatus as AdminOrderStatus)
+   931→   931→}
+   932→   932→

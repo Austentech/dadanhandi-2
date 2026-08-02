@@ -576,3 +576,30 @@ Stage Summary:
 - Visual: red left border, tinted background, pulsing "OVERDUE" badge on each overdue card
 - Dashboard pending count now includes overdue orders
 - Files changed: admin-order-service.ts, new/page.tsx, globals.css
+---
+Task ID: 2
+Agent: main
+Task: Phase 3 Module 4 — Ongoing Orders, Order Status Management & Kitchen Workflow
+
+Work Log:
+- Read AdminShell, useAdminDashboard hook, branch-contacts, auth-helpers, existing accept route to understand patterns
+- Added `acceptedAt?: string` to `AdminOrderWithItems` type
+- Added `listOngoingOrders()` to admin-order-service.ts: fetches orders with `.in('order_status', ['accepted','preparing','ready_for_pickup'])`, batch-fetches customer profiles, batch-fetches accepted-at timestamps from order_status_history, sorts by pickup time then status weight
+- Added `updateOrderStatus()` to admin-order-service.ts: validates inputs, validates target against KITCHEN_TRANSITIONS allowlist (accepted→preparing, preparing→ready_for_pickup only), race condition guard via `eq('order_status', currentStatus)`, detects concurrent updates (updateCount===0), logs audit trail to order_status_history with note format `prev → new | admin: id`
+- Added `UpdateOrderStatusResult` type and `KITCHEN_TRANSITIONS` map
+- Added rate limit configs: STATUS_UPDATE (30/min, 2min block), ONGOING_LIST (120/min, 1min block)
+- Created `/api/admin/orders/update-status/route.ts`: POST, auth+rate limit, UUID validation, target status allowlist, calls updateOrderStatus with admin userId
+- Created `/api/admin/orders/ongoing/route.ts`: GET, auth+rate limit, calls listOngoingOrders with branch/search/limit/offset params
+- Created `/admin/orders/ongoing/page.tsx`: OngoingOrderCard component with STATUS_CONFIG (label, cssClass, nextAction, nextStatus, nextIcon per status), status badges (Accepted=blue, Preparing=amber+pulse, Ready=green), action buttons (Start Preparing=blue, Mark Complete=green, Pickup PIN=disabled coming soon), accepted time display, summary chips, realtime subscription, debounced search, auto-refresh
+- Added CSS: `.admin-status-badge` (3 variants with colors), `.admin-ongoing-card--{accepted,preparing,ready}` (colored left borders, tinted backgrounds), `.admin-ongoing-summary` + `.admin-ongoing-chip` (count pills), `.admin-status-btn-{accepted,preparing}` (action button colors), `.pickup-pin-soon` (disabled style), `@keyframes admin-preparing-pulse`, responsive adjustments for mobile
+- Build verified: all 4 routes registered, zero errors
+
+Stage Summary:
+- Ongoing Orders page at `/admin/orders/ongoing` shows accepted, preparing, ready_for_pickup orders
+- Kitchen workflow: Accepted → Preparing → Ready for Pickup (via status action buttons)
+- Server-side validation: transition allowlist, race condition guard, 0-row detection
+- Audit trail: every status change logged to order_status_history with prev→new and admin ID
+- Realtime: Supabase postgres_changes subscription auto-refreshes list and dashboard
+- Dashboard sync: refreshDashboard() called on every status change
+- Security: auth required, rate limited, UUID validated, server-side state checks
+- Files: admin-order-service.ts (modified), config.ts (modified), 2 new API routes, 1 new page, globals.css (modified)

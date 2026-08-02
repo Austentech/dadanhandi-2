@@ -6922,6 +6922,119 @@ a, p, span, div {
   background: #fef7f7;
 }
 
+/* ---- Status Badge ---- */
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.admin-status-badge.accepted {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.admin-status-badge.preparing {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+  animation: admin-preparing-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes admin-preparing-pulse {
+  0%, 100% { border-color: #fde68a; }
+  50% { border-color: #fbbf24; }
+}
+
+.admin-status-badge.ready {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+/* ---- Ongoing Order Card Variants ---- */
+.admin-ongoing-card--accepted {
+  border-left: 4px solid #3b82f6;
+}
+
+.admin-ongoing-card--preparing {
+  border-left: 4px solid #f59e0b;
+  background: #fffdf7;
+}
+
+.admin-ongoing-card--ready {
+  border-left: 4px solid #10b981;
+  background: #f0fdf9;
+}
+
+/* ---- Ongoing Summary Chips ---- */
+.admin-ongoing-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.admin-ongoing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 20px;
+}
+
+.admin-ongoing-chip.accepted {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.admin-ongoing-chip.preparing {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.admin-ongoing-chip.ready {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+/* ---- Status Action Buttons ---- */
+.admin-status-btn-accepted {
+  background: #2563eb;
+  color: #fff;
+  border: 1px solid #2563eb;
+}
+
+.admin-status-btn-accepted:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.admin-status-btn-preparing {
+  background: #059669;
+  color: #fff;
+  border: 1px solid #059669;
+}
+
+.admin-status-btn-preparing:hover:not(:disabled) {
+  background: #047857;
+}
+
+.pickup-pin-soon {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+  cursor: not-allowed;
+}
+
 .admin-order-card-header {
   display: flex;
   align-items: flex-start;
@@ -7335,6 +7448,26 @@ a, p, span, div {
   .admin-overdue-badge {
     font-size: 0.62rem;
     padding: 1px 8px;
+  }
+
+  .admin-ongoing-card--accepted,
+  .admin-ongoing-card--preparing,
+  .admin-ongoing-card--ready {
+    border-left-width: 3px;
+  }
+
+  .admin-ongoing-summary {
+    gap: 6px;
+  }
+
+  .admin-ongoing-chip {
+    font-size: 0.68rem;
+    padding: 4px 10px;
+  }
+
+  .admin-status-badge {
+    font-size: 0.62rem;
+    padding: 2px 8px;
   }
 
   .admin-order-card-footer {

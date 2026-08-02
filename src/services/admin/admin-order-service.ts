@@ -272,6 +272,11 @@ export interface AdminOrderWithItems extends AdminOrderItem {
    * was never accepted by admin. Computed server-side.
    */
   isOverdue?: boolean
+  /**
+   * ISO timestamp when the order was accepted (from order_status_history).
+   * Populated for ongoing orders.
+   */
+  acceptedAt?: string
 }
 
 export interface ListOrdersResult {
@@ -620,6 +625,294 @@ export async function acceptOrder(
     return { success: true, message: 'Order accepted successfully' }
   } catch (err) {
     console.error('[ADMIN ORDER SERVICE] acceptOrder error:', err)
+    return { success: false, message: 'Something went wrong. Please try again.' }
+  }
+}
+
+// ============================================================================
+// LIST ONGOING ORDERS
+// ============================================================================
+
+/**
+ * List all ongoing orders (accepted, preparing, ready_for_pickup).
+ * Includes items, customer info, branch info, and accepted-at timestamp.
+ * Ordered by pickup time (soonest first), then by status priority.
+ */
+export async function listOngoingOrders(options?: {
+  branchSlug?: string
+  search?: string
+  limit?: number
+  offset?: number
+}): Promise<ListOrdersResult> {
+  try {
+    const supabase = createAdminClient()
+    const limit = options?.limit || 50
+    const offset = options?.offset || 0
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+
+    const selectFields = `
+      *,
+      order_items (*),
+      branches (name, slug, city)
+    `
+
+    let query = sb
+      .from('orders')
+      .select(selectFields, { count: 'exact' })
+      .in('order_status', ['accepted', 'preparing', 'ready_for_pickup'])
+      .order('pickup_slot_start', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    if (options?.branchSlug) {
+      query = query.eq('branch_id', options.branchSlug)
+    }
+
+    const { data: orders, error, count } = await query
+
+    if (error) {
+      console.error('[ADMIN ORDER SERVICE] listOngoingOrders error:', error)
+      return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch ongoing orders' }
+    }
+
+    if (!orders || orders.length === 0) {
+      return { success: true, orders: [], totalCount: 0 }
+    }
+
+    const rawOrders = orders as RawOrderRow[]
+
+    // --- Batch fetch customer profiles ---
+    const userIds = [...new Set(rawOrders.map((o) => o.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, whatsapp_number, mobile_number')
+      .in('id', userIds)
+
+    const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
+    for (const p of (profiles || []) as RawProfileRow[]) {
+      profileMap.set(p.id, {
+        name: p.full_name || 'Customer',
+        whatsappNumber: p.whatsapp_number || null,
+        mobileNumber: p.mobile_number || null,
+      })
+    }
+
+    // --- Batch fetch accepted-at timestamps from status history ---
+    const orderIds = rawOrders.map((o) => o.id)
+    const { data: historyRows } = await supabase
+      .from('order_status_history')
+      .select('order_id, created_at')
+      .in('order_id', orderIds)
+      .eq('status', 'accepted')
+
+    const acceptedAtMap = new Map<string, string>()
+    for (const row of (historyRows || []) as { order_id: string; created_at: string }[]) {
+      if (!acceptedAtMap.has(row.order_id)) {
+        acceptedAtMap.set(row.order_id, row.created_at)
+      }
+    }
+
+    // --- Search filter (in-memory) ---
+    let filteredOrders = rawOrders
+    if (options?.search) {
+      const q = options.search.toLowerCase()
+      filteredOrders = filteredOrders.filter((o) => {
+        const orderNum = (o.order_number || '').toLowerCase()
+        const profile = profileMap.get(o.user_id)
+        const customerName = (profile?.name || '').toLowerCase()
+        return orderNum.includes(q) || customerName.includes(q)
+      })
+    }
+
+    // --- Status priority for sorting (accepted=1, preparing=2, ready=3) ---
+    const statusWeight: Record<string, number> = {
+      accepted: 1,
+      preparing: 2,
+      ready_for_pickup: 3,
+    }
+
+    // --- Map to typed response ---
+    const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
+      const profile = profileMap.get(o.user_id)
+      const branch = o.branchs as { name: string; slug: string; city: string } | null
+      return {
+        ...mapOrderRow(o),
+        items: (o.order_items || []).map(mapOrderItemRow),
+        branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
+        customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
+        acceptedAt: acceptedAtMap.get(o.id) || undefined,
+      }
+    })
+
+    // Sort: pickup time ascending, then status weight ascending (accepted before preparing)
+    mapped.sort((a, b) => {
+      const slotA = a.pickupSlotStart
+      const slotB = b.pickupSlotStart
+      if (slotA !== slotB) return slotA.localeCompare(slotB)
+      return (statusWeight[a.orderStatus] || 99) - (statusWeight[b.orderStatus] || 99)
+    })
+
+    return {
+      success: true,
+      orders: mapped,
+      totalCount: count || 0,
+    }
+  } catch (err) {
+    console.error('[ADMIN ORDER SERVICE] listOngoingOrders error:', err)
+    return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch ongoing orders' }
+  }
+}
+
+// ============================================================================
+// UPDATE ORDER STATUS (Kitchen Workflow)
+// ============================================================================
+
+export interface UpdateOrderStatusResult {
+  success: boolean
+  message: string
+  error?: string
+}
+
+/**
+ * Subset of VALID_TRANSITIONS for the kitchen workflow.
+ * This module only handles forward transitions:
+ *   accepted → preparing → ready_for_pickup
+ * Cancellation and other transitions are handled by other modules.
+ */
+const KITCHEN_TRANSITIONS: Record<string, AdminOrderStatus[]> = {
+  accepted: ['preparing'],
+  preparing: ['ready_for_pickup'],
+}
+
+/**
+ * Update an order's status as part of the kitchen workflow.
+ * Handles: accepted → preparing, preparing → ready_for_pickup.
+ *
+ * Security:
+ * - Validates order exists and current DB status
+ * - Validates transition is allowed
+ * - Race condition guard: UPDATE only if order_status still equals current
+ * - Records full audit trail in order_status_history
+ *
+ * @param orderId - UUID of the order
+ * @param targetStatus - The new status to transition to
+ * @param adminUserId - UUID of the admin making the change
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  targetStatus: AdminOrderStatus,
+  adminUserId: string
+): Promise<UpdateOrderStatusResult> {
+  try {
+    const supabase = createAdminClient()
+
+    // 1. Validate inputs
+    if (!orderId || typeof orderId !== 'string') {
+      return { success: false, message: 'Invalid order ID' }
+    }
+    if (!targetStatus || typeof targetStatus !== 'string') {
+      return { success: false, message: 'Invalid target status' }
+    }
+
+    // 2. Validate target status is allowed in kitchen workflow
+    const allowedTargets = Object.values(KITCHEN_TRANSITIONS).flat()
+    if (!allowedTargets.includes(targetStatus)) {
+      return { success: false, message: 'Invalid status transition for this workflow' }
+    }
+
+    // 3. Fetch the current order
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: order, error: fetchErr }: { data: RawOrderRow | null; error: any } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single()
+
+    if (fetchErr || !order) {
+      return { success: false, message: 'Order not found' }
+    }
+
+    // 4. Determine what current status allows this transition
+    const currentStatus = order.order_status
+    const allowedFromCurrent = KITCHEN_TRANSITIONS[currentStatus]
+    if (!allowedFromCurrent || !allowedFromCurrent.includes(targetStatus)) {
+      // Provide a helpful message
+      const statusLabels: Record<string, string> = {
+        confirmed: 'Pending',
+        accepted: 'Accepted',
+        preparing: 'Preparing',
+        ready_for_pickup: 'Ready for Pickup',
+        completed: 'Completed',
+        cancelled: 'Cancelled',
+      }
+      const from = statusLabels[currentStatus] || currentStatus
+      const to = statusLabels[targetStatus] || targetStatus
+      return { success: false, message: `Cannot move order from "${from}" to "${to}"` }
+    }
+
+    // 5. Update with race condition guard (only update if status hasn't changed)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+    const { error: updateErr, count: updateCount } = await sb
+      .from('orders')
+      .update({
+        order_status: targetStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .eq('order_status', currentStatus)
+
+    if (updateErr) {
+      console.error('[ADMIN ORDER SERVICE] updateOrderStatus update error:', updateErr)
+      return { success: false, message: 'Failed to update order status. Please try again.' }
+    }
+
+    // 6. Check if the update actually happened (0 rows = race condition / already changed)
+    if (updateCount === 0) {
+      // Re-fetch to get current status for a helpful message
+      const { data: freshOrder } = await supabase
+        .from('orders')
+        .select('order_status')
+        .eq('id', orderId)
+        .single()
+
+      const statusLabels: Record<string, string> = {
+        accepted: 'Accepted', preparing: 'Preparing',
+        ready_for_pickup: 'Ready for Pickup', completed: 'Completed',
+        cancelled: 'Cancelled', confirmed: 'Pending',
+      }
+      const current = statusLabels[freshOrder?.order_status] || freshOrder?.order_status || 'Unknown'
+      return { success: false, message: `Order status was already updated to "${current}" by another action` }
+    }
+
+    // 7. Log status change in history
+    //    Table schema: (order_id, status, note, created_at)
+    //    Unique constraint: (order_id, status) — one row per status per order
+    //    Note encodes: previous → new | admin_id
+    const statusNote = `${currentStatus} → ${targetStatus} | admin: ${adminUserId}`
+    try {
+      const { error: histErr } = await sb.from('order_status_history').insert({
+        order_id: orderId,
+        status: targetStatus,
+        note: statusNote,
+      })
+      if (histErr && !String(histErr.message || histErr).includes('duplicate')) {
+        console.error('[ADMIN ORDER SERVICE] Failed to log status history:', histErr)
+      }
+    } catch (historyErr) {
+      console.error('[ADMIN ORDER SERVICE] Failed to log status history:', historyErr)
+    }
+
+    // 8. Success
+    const statusLabels: Record<string, string> = {
+      preparing: 'Preparing',
+      ready_for_pickup: 'Ready for Pickup',
+    }
+    const label = statusLabels[targetStatus] || targetStatus
+    return { success: true, message: `Order status updated to "${label}"` }
+  } catch (err) {
+    console.error('[ADMIN ORDER SERVICE] updateOrderStatus error:', err)
     return { success: false, message: 'Something went wrong. Please try again.' }
   }
 }

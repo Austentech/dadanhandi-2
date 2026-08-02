@@ -36,6 +36,10 @@ export const ADMIN_CONFIG = {
     DASHBOARD: { maxAttempts: 60, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
     /** Order list: 120 requests per minute */
     ORDERS_LIST: { maxAttempts: 120, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
+    /** Status update: 30 requests per minute */
+    STATUS_UPDATE: { maxAttempts: 30, windowMs: 60 * 1000, blockDurationMs: 2 * 60 * 1000 },
+    /** Ongoing orders list: 120 requests per minute */
+    ONGOING_LIST: { maxAttempts: 120, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
   },
 
   /** Session: duration in hours (7 days) */

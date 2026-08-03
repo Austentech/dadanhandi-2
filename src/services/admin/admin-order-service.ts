@@ -187,8 +187,6 @@ interface RawOrderRow {
   created_at: string
   updated_at: string
   order_items?: RawOrderItemRow[]
-  /** Joined from branches table. Key derived by PostgREST from FK column 'branch_id' → 'branch' */
-  branch?: { name: string; slug: string; city: string } | null
 }
 
 interface RawOrderItemRow {
@@ -367,8 +365,7 @@ export async function listOrdersByStatus(
 
     const selectFields = `
       *,
-      order_items (*),
-      branches (name, slug, city)
+      order_items (*)
     `
 
     let orders: RawOrderRow[]
@@ -482,6 +479,18 @@ export async function listOrdersByStatus(
       })
     }
 
+    // Fetch branch info separately (avoid unreliable PostgREST join key naming)
+    const branchIds = [...new Set(orders.map((o: RawOrderRow) => o.branch_id))]
+    const { data: branches } = await supabase
+      .from('branches')
+      .select('id, name, slug, city')
+      .in('id', branchIds)
+
+    const branchMap = new Map<string, { name: string; slug: string; city: string }>()
+    for (const b of (branches || []) as { id: string; name: string; slug: string; city: string }[]) {
+      branchMap.set(b.id, { name: b.name, slug: b.slug, city: b.city })
+    }
+
     // Search filter (applied in-memory since Supabase free tier doesn't support full-text across joins)
     let filteredOrders = orders as RawOrderRow[]
     if (options?.search) {
@@ -509,12 +518,11 @@ export async function listOrdersByStatus(
     // Map to typed response with proper snake_case -> camelCase conversion
     const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
       const profile = profileMap.get(o.user_id)
-      // PostgREST derives the embedded key from the FK column: branch_id → 'branch'
-      const branch = o.branch as { name: string; slug: string; city: string } | null
+      const branch = branchMap.get(o.branch_id)
       return {
         ...mapOrderRow(o),
         items: (o.order_items || []).map(mapOrderItemRow),
-        branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
+        branch: branch || null,
         customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
         isOverdue: status === 'confirmed' ? computeIsOverdue(o) : undefined,
       }
@@ -658,8 +666,7 @@ export async function listOngoingOrders(options?: {
 
     const selectFields = `
       *,
-      order_items (*),
-      branches (name, slug, city)
+      order_items (*)
     `
 
     let query = sb
@@ -703,6 +710,18 @@ export async function listOngoingOrders(options?: {
       })
     }
 
+    // --- Batch fetch branch info (separate query, not PostgREST join) ---
+    const branchIdSet = [...new Set(rawOrders.map((o) => o.branch_id))]
+    const { data: branchRows } = await supabase
+      .from('branches')
+      .select('id, name, slug, city')
+      .in('id', branchIdSet)
+
+    const branchMap = new Map<string, { name: string; slug: string; city: string }>()
+    for (const b of (branchRows || []) as { id: string; name: string; slug: string; city: string }[]) {
+      branchMap.set(b.id, { name: b.name, slug: b.slug, city: b.city })
+    }
+
     // --- Batch fetch accepted-at timestamps from status history ---
     const orderIds = rawOrders.map((o) => o.id)
     const { data: historyRows } = await supabase
@@ -740,12 +759,11 @@ export async function listOngoingOrders(options?: {
     // --- Map to typed response ---
     const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
       const profile = profileMap.get(o.user_id)
-      // PostgREST derives the embedded key from the FK column: branch_id → 'branch'
-      const branch = o.branch as { name: string; slug: string; city: string } | null
+      const branch = branchMap.get(o.branch_id)
       return {
         ...mapOrderRow(o),
         items: (o.order_items || []).map(mapOrderItemRow),
-        branch: branch ? { name: branch.name, slug: branch.slug, city: branch.city } : null,
+        branch: branch || null,
         customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
         acceptedAt: acceptedAtMap.get(o.id) || undefined,
       }

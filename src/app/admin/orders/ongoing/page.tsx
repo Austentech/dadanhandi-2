@@ -176,14 +176,14 @@ function OngoingOrderCard({
           <span className="admin-order-meta-value">{order.customer?.name || 'Unknown'}</span>
         </div>
 
-        {order.customer?.whatsappNumber && (
+        {(order.customer?.whatsappNumber || order.customer?.mobileNumber) && (
           <a
-            href={`tel:${order.customer.whatsappNumber}`}
+            href={`tel:${order.customer.whatsappNumber || order.customer.mobileNumber}`}
             className="admin-order-meta-row admin-order-phone-link"
-            aria-label={`Call customer ${order.customer.name} at ${order.customer.whatsappNumber}`}
+            aria-label={`Call customer ${order.customer?.name || ''} at ${order.customer.whatsappNumber || order.customer.mobileNumber}`}
           >
             <Phone size={13} />
-            <span>{order.customer.whatsappNumber}</span>
+            <span>{order.customer.whatsappNumber || order.customer.mobileNumber}</span>
           </a>
         )}
 

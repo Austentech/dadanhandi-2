@@ -603,3 +603,28 @@ Stage Summary:
 - Dashboard sync: refreshDashboard() called on every status change
 - Security: auth required, rate limited, UUID validated, server-side state checks
 - Files: admin-order-service.ts (modified), config.ts (modified), 2 new API routes, 1 new page, globals.css (modified)
+
+---
+Task ID: 21
+Agent: Main Agent
+Task: Phase 3 Module 5 — Secure Pickup PIN Generation & Customer Synchronization
+
+Work Log:
+- Explored full codebase structure, understood existing patterns for orders, services, DB
+- Created migration 009_pickup_pin_system.sql: adds pin_generated_at, pin_generated_by columns, pickup_pin_audit_log table, partial unique index for active PIN uniqueness, updated RPCs
+- Created admin-pickup-pin-service.ts: cryptographically secure 4-digit PIN generation via crypto.getRandomValues(), uniqueness validation, atomic status transition, race condition protection via optimistic locking, audit logging
+- Created API route /api/admin/orders/generate-pin: admin auth, rate limiting (15/min), UUID validation, full error handling
+- Updated admin config with PIN_GENERATE rate limit
+- Updated admin-order-service.ts: added pickupPin/pinGeneratedAt to types and mapping in listOngoingOrders, removed preparing→ready_for_pickup from KITCHEN_TRANSITIONS (now handled by PIN generation)
+- Updated update-status API route: removed ready_for_pickup from ALLOWED_TARGETS
+- Rewrote admin Ongoing Orders page: Verify & Generate Pickup PIN button for preparing orders, PIN display section for ready_for_pickup, PIN generated badge in footer, loading states, duplicate-click protection
+- Updated customer AccountOngoingOrders: dynamic status labels/badges (Accepted/Preparing/Ready for Pickup), realtime subscription for PIN and status changes, proper date formatting
+- Updated customer ongoing-orders API: active statuses changed from ['confirmed'] to ['accepted','preparing','ready_for_pickup'], added pinGeneratedAt to response
+- Updated OngoingOrder type in account-store with pinGeneratedAt field
+- Added CSS styles: admin-pickup-pin-section, admin-pin-generate-btn (gradient), admin-pickup-pin-digits (monospace), admin-pin-generated-badge, responsive styles for 480px
+- Build verified: compiled successfully, no new TS errors
+
+Stage Summary:
+- Files created: supabase/migrations/009_pickup_pin_system.sql, src/services/admin/admin-pickup-pin-service.ts, src/app/api/admin/orders/generate-pin/route.ts
+- Files modified: src/services/admin/admin-order-service.ts, src/app/api/admin/orders/update-status/route.ts, src/app/admin/orders/ongoing/page.tsx, src/components/account/AccountOngoingOrders.tsx, src/app/api/account/ongoing-orders/route.ts, src/store/account-store.ts, src/lib/admin/config.ts, src/app/globals.css
+- Key design: PIN generation is the exclusive path from preparing→ready_for_pickup, concurrent-safe via optimistic locking + partial unique index

@@ -184,6 +184,9 @@ interface RawOrderRow {
   payment_method: string | null
   razorpay_order_id: string | null
   customer_notes: string | null
+  pickup_pin: string | null
+  pin_generated_at: string | null
+  pin_generated_by: string | null
   created_at: string
   updated_at: string
   order_items?: RawOrderItemRow[]
@@ -277,6 +280,14 @@ export interface AdminOrderWithItems extends AdminOrderItem {
    * Populated for ongoing orders.
    */
   acceptedAt?: string
+  /**
+   * The 4-digit pickup PIN. Populated after admin generates it.
+   */
+  pickupPin?: string | null
+  /**
+   * ISO timestamp when the pickup PIN was generated.
+   */
+  pinGeneratedAt?: string | null
 }
 
 export interface ListOrdersResult {
@@ -766,6 +777,8 @@ export async function listOngoingOrders(options?: {
         branch: branch || null,
         customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
         acceptedAt: acceptedAtMap.get(o.id) || undefined,
+        pickupPin: o.pickup_pin || null,
+        pinGeneratedAt: o.pin_generated_at || null,
       }
     })
 
@@ -801,17 +814,18 @@ export interface UpdateOrderStatusResult {
 /**
  * Subset of VALID_TRANSITIONS for the kitchen workflow.
  * This module only handles forward transitions:
- *   accepted → preparing → ready_for_pickup
+ *   accepted → preparing
+ * preparing → ready_for_pickup is handled by the PIN generation endpoint.
  * Cancellation and other transitions are handled by other modules.
  */
 const KITCHEN_TRANSITIONS: Record<string, AdminOrderStatus[]> = {
   accepted: ['preparing'],
-  preparing: ['ready_for_pickup'],
 }
 
 /**
  * Update an order's status as part of the kitchen workflow.
- * Handles: accepted → preparing, preparing → ready_for_pickup.
+ * Handles: accepted → preparing.
+ * preparing → ready_for_pickup is handled by the PIN generation endpoint.
  *
  * Security:
  * - Validates order exists and current DB status
@@ -895,7 +909,7 @@ export async function updateOrderStatus(
     // 6. Check if the update actually happened (0 rows = race condition / already changed)
     if (updateCount === 0) {
       // Re-fetch to get current status for a helpful message
-      const { data: freshOrder } = await supabase
+      const { data: freshOrder }: { data: any } = await sb
         .from('orders')
         .select('order_status')
         .eq('id', orderId)

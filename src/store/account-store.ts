@@ -99,6 +99,7 @@ export interface OngoingOrder {
   finalAmountPaise: number
   orderStatus: string
   pickupPin: string | null
+  pinGeneratedAt: string | null
   createdAt: string
   updatedAt: string
 }

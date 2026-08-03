@@ -7028,11 +7028,80 @@ a, p, span, div {
   background: #047857;
 }
 
-.pickup-pin-soon {
-  background: #f1f5f9;
-  color: #94a3b8;
-  border: 1px solid #e2e8f0;
-  cursor: not-allowed;
+/* Pickup PIN Generate Button */
+.admin-pin-generate-btn {
+  background: linear-gradient(135deg, #7A0C0C, #C46A2E) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+.admin-pin-generate-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5C0909, #A85525) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(122, 12, 12, 0.3);
+}
+.admin-pin-generate-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Pickup PIN Display Section (inside order card) */
+.admin-pickup-pin-section {
+  margin: 0 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+
+.admin-pickup-pin-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #166534;
+  margin-bottom: 8px;
+}
+
+.admin-pickup-pin-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-pickup-pin-digits {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #166534;
+  letter-spacing: 6px;
+  font-family: 'Courier New', Courier, monospace;
+  background: #fff;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 2px solid #166534;
+}
+
+.admin-pickup-pin-time {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+/* PIN Generated Badge (in footer for ready_for_pickup) */
+.admin-pin-generated-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid #bbf7d0;
+}
+.admin-pin-generated-badge svg {
+  color: #22c55e;
 }
 
 .admin-order-card-header {
@@ -7523,6 +7592,32 @@ a, p, span, div {
 
   .admin-filter-bar > div:first-child {
     max-width: 100% !important;
+  }
+
+  .admin-pickup-pin-section {
+    margin: 0 8px;
+    padding: 10px 12px;
+  }
+
+  .admin-pickup-pin-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .admin-pickup-pin-digits {
+    font-size: 1.3rem;
+    padding: 4px 12px;
+  }
+
+  .admin-pin-generate-btn {
+    font-size: 0.75rem !important;
+    padding: 8px 12px !important;
+  }
+
+  .admin-pin-generated-badge {
+    font-size: 0.75rem;
+    padding: 5px 10px;
   }
 }
 

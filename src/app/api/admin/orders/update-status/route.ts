@@ -14,7 +14,7 @@ import { ADMIN_CONFIG } from '@/lib/admin/config'
 import type { AdminOrderStatus } from '@/services/admin/admin-order-service'
 
 /** Only these target statuses are allowed through this endpoint */
-const ALLOWED_TARGETS: AdminOrderStatus[] = ['preparing', 'ready_for_pickup']
+const ALLOWED_TARGETS: AdminOrderStatus[] = ['preparing']
 
 export async function POST(request: Request) {
   const auth = await validateAdminRequest(request, {

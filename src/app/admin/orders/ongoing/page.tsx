@@ -18,6 +18,8 @@ import {
   CreditCard,
   ChefHat,
   Clock,
+  KeyRound,
+  ShieldCheck,
 } from 'lucide-react'
 import type { AdminOrderWithItems } from '@/services/admin/admin-order-service'
 
@@ -42,9 +44,9 @@ const STATUS_CONFIG: Record<string, {
   preparing: {
     label: 'Preparing',
     cssClass: 'preparing',
-    nextAction: 'Mark Complete',
+    nextAction: 'Verify & Generate Pickup PIN',
     nextStatus: 'ready_for_pickup',
-    nextIcon: <CheckCircle size={16} />,
+    nextIcon: <ShieldCheck size={16} />,
   },
   ready_for_pickup: {
     label: 'Ready for Pickup',
@@ -56,7 +58,7 @@ const STATUS_CONFIG: Record<string, {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers (shared with New Orders page patterns)
+// Helpers
 // ---------------------------------------------------------------------------
 
 function formatPaise(paise: number): string {
@@ -137,17 +139,23 @@ function formatPaymentMethod(method: string | null): string {
 function OngoingOrderCard({
   order,
   onStatusUpdate,
+  onGeneratePin,
   updatingId,
+  generatingPinId,
 }: {
   order: AdminOrderWithItems
   onStatusUpdate: (orderId: string, targetStatus: string) => void
+  onGeneratePin: (orderId: string) => void
   updatingId: string | null
+  generatingPinId: string | null
 }) {
   const isUpdating = updatingId === order.id
+  const isGeneratingPin = generatingPinId === order.id
   const totalDonation = order.donationPlantationPaise + order.donationHungerPaise
   const hasReward = order.rewardPointsRedeemed > 0
   const statusCfg = STATUS_CONFIG[order.orderStatus]
   const branchContact = order.branch?.slug ? getBranchContact(order.branch.slug) : null
+  const hasPin = !!order.pickupPin
 
   return (
     <div
@@ -285,6 +293,24 @@ function OngoingOrderCard({
         )}
       </div>
 
+      {/* Pickup PIN Display (shown for ready_for_pickup orders) */}
+      {hasPin && order.orderStatus === 'ready_for_pickup' && (
+        <div className="admin-pickup-pin-section" aria-label={`Pickup PIN: ${order.pickupPin}`}>
+          <div className="admin-pickup-pin-header">
+            <KeyRound size={14} />
+            <span>Pickup PIN Generated</span>
+          </div>
+          <div className="admin-pickup-pin-display">
+            <span className="admin-pickup-pin-digits">{order.pickupPin}</span>
+            {order.pinGeneratedAt && (
+              <span className="admin-pickup-pin-time">
+                {formatTime(order.pinGeneratedAt)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Payment status + Action Buttons */}
       <div className="admin-order-card-footer">
         <div className="admin-order-payment-status">
@@ -301,7 +327,20 @@ function OngoingOrderCard({
 
         {/* Workflow Action Buttons */}
         <div className="admin-order-actions">
-          {statusCfg?.nextAction && statusCfg.nextStatus ? (
+          {order.orderStatus === 'preparing' ? (
+            <button
+              className="admin-order-btn status-action admin-status-btn-preparing admin-pin-generate-btn"
+              onClick={() => onGeneratePin(order.id)}
+              disabled={isGeneratingPin}
+              aria-label={`Verify and generate pickup PIN for order ${order.orderNumber}`}
+            >
+              {isGeneratingPin ? (
+                <><span className="admin-btn-spinner" /> Generating PIN...</>
+              ) : (
+                <><ShieldCheck size={16} /> Verify & Generate Pickup PIN</>
+              )}
+            </button>
+          ) : statusCfg?.nextAction && statusCfg.nextStatus ? (
             <button
               className={`admin-order-btn status-action admin-status-btn-${statusCfg.cssClass}`}
               onClick={() => onStatusUpdate(order.id, statusCfg.nextStatus!)}
@@ -314,16 +353,12 @@ function OngoingOrderCard({
                 <>{statusCfg.nextIcon} {statusCfg.nextAction}</>
               )}
             </button>
-          ) : (
-            <button
-              className="admin-order-btn pickup-pin-soon"
-              disabled
-              title="Pickup PIN generation coming in the next module"
-              aria-label="Generate pickup PIN — coming soon"
-            >
-              <Clock size={16} /> Pickup PIN
-            </button>
-          )}
+          ) : hasPin ? (
+            <div className="admin-pin-generated-badge" aria-label="Pickup PIN has been generated">
+              <KeyRound size={14} />
+              <span>PIN: {order.pickupPin}</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -347,6 +382,7 @@ export default function OngoingOrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [generatingPinId, setGeneratingPinId] = useState<string | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const { refresh: refreshDashboard } = useAdminDashboard()
 
@@ -400,7 +436,6 @@ export default function OngoingOrdersPage() {
                   fetchOrders(search)
                   refreshDashboard()
                 } else if (newStatus && !ongoingStatuses.includes(newStatus)) {
-                  // Order left ongoing (e.g. accepted → cancelled), remove from list
                   setOrders((prev) => prev.filter((o) => o.id !== payload.new?.id))
                   refreshDashboard()
                 }
@@ -442,7 +477,7 @@ export default function OngoingOrdersPage() {
     }, 400)
   }, [fetchOrders])
 
-  // Status update handler
+  // Status update handler (accepted → preparing)
   const handleStatusUpdate = useCallback(async (orderId: string, targetStatus: string) => {
     setUpdatingId(orderId)
     try {
@@ -453,7 +488,6 @@ export default function OngoingOrdersPage() {
       })
       const data = await res.json()
       if (data.success) {
-        // Remove from list and refresh (realtime will also trigger)
         setOrders((prev) => prev.filter((o) => o.id !== orderId))
         refreshDashboard()
       } else {
@@ -465,6 +499,30 @@ export default function OngoingOrdersPage() {
       setUpdatingId(null)
     }
   }, [refreshDashboard])
+
+  // Pickup PIN generation handler
+  const handleGeneratePin = useCallback(async (orderId: string) => {
+    setGeneratingPinId(orderId)
+    try {
+      const res = await fetch('/api/admin/orders/generate-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        // Refresh the list to show updated status and PIN
+        fetchOrders(search)
+        refreshDashboard()
+      } else {
+        alert(data.message || 'Failed to generate pickup PIN')
+      }
+    } catch {
+      alert('Network error. Please try again.')
+    } finally {
+      setGeneratingPinId(null)
+    }
+  }, [fetchOrders, search, refreshDashboard])
 
   // Client-side search filter
   const displayOrders = search
@@ -571,7 +629,9 @@ export default function OngoingOrdersPage() {
               key={order.id}
               order={order}
               onStatusUpdate={handleStatusUpdate}
+              onGeneratePin={handleGeneratePin}
               updatingId={updatingId}
+              generatingPinId={generatingPinId}
             />
           ))}
         </div>

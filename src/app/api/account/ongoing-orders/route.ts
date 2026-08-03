@@ -2,8 +2,8 @@
  * GET /api/account/ongoing-orders
  * ------------------------------
  * Get only active (non-terminal) orders for the user.
- * Active = confirmed (includes future: preparing, ready_for_pickup, etc.)
- * Excludes: draft, awaiting_payment, cancelled, failed, completed
+ * Active = accepted, preparing, ready_for_pickup
+ * Excludes: draft, awaiting_payment, confirmed, cancelled, failed, completed
  *
  * Security: Auth + rate limit
  */
@@ -48,14 +48,15 @@ export async function GET(request: Request) {
     } else {
       console.warn('[ACCOUNT ONGOING] RPC not available, using direct query:', rpcErr?.message)
 
-      // Direct query fallback — active statuses
-      const activeStatuses = ['confirmed', 'preparing', 'ready_for_pickup']
+      // Direct query fallback — active kitchen statuses
+      const activeStatuses = ['accepted', 'preparing', 'ready_for_pickup']
       const { data: directData, error: directErr } = await supabase
         .from('orders')
-        .select('id, order_number, branch_id, pickup_date, pickup_slot_start, pickup_slot_end, final_amount_paise, order_status, pickup_pin, created_at, updated_at')
+        .select('id, order_number, branch_id, pickup_date, pickup_slot_start, pickup_slot_end, final_amount_paise, order_status, pickup_pin, pin_generated_at, created_at, updated_at')
         .eq('user_id', user.id)
         .in('order_status', activeStatuses)
-        .order('created_at', { ascending: false })
+        .order('pickup_date', { ascending: false })
+        .order('pickup_slot_start', { ascending: false })
         .limit(20)
 
       if (directErr) {
@@ -89,6 +90,7 @@ export async function GET(request: Request) {
           finalAmountPaise: o.final_amount_paise,
           orderStatus: o.order_status,
           pickupPin: o.pickup_pin,
+          pinGeneratedAt: o.pin_generated_at,
           createdAt: o.created_at,
           updatedAt: o.updated_at,
         }))

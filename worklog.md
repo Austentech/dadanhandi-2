@@ -628,3 +628,27 @@ Stage Summary:
 - Files created: supabase/migrations/009_pickup_pin_system.sql, src/services/admin/admin-pickup-pin-service.ts, src/app/api/admin/orders/generate-pin/route.ts
 - Files modified: src/services/admin/admin-order-service.ts, src/app/api/admin/orders/update-status/route.ts, src/app/admin/orders/ongoing/page.tsx, src/components/account/AccountOngoingOrders.tsx, src/app/api/account/ongoing-orders/route.ts, src/store/account-store.ts, src/lib/admin/config.ts, src/app/globals.css
 - Key design: PIN generation is the exclusive path from preparing→ready_for_pickup, concurrent-safe via optimistic locking + partial unique index
+
+---
+Task ID: 22
+Agent: Main Agent
+Task: Phase 3 Module 6 — Ready for Pickup, Order Collection & Completed Orders Workflow
+
+Work Log:
+- Explored existing codebase: AdminShell sidebar, past orders placeholder, ongoing orders patterns, dashboard stats
+- Created migration 010_order_completion.sql: adds completed_at, completed_by columns, updated list_orders_for_user and get_order_detail_for_user RPCs
+- Added 'Ready for Pickup' nav item to AdminShell sidebar with KeyRound icon
+- Added COMPLETE_ORDER, READY_PICKUP_LIST, PAST_LIST rate limits to admin config
+- Added 3 new service functions to admin-order-service.ts: listReadyForPickupOrders, listPastOrders (with AdminPastOrder type), completeOrder (with atomic optimistic lock)
+- Created 3 new API routes: /api/admin/orders/ready-pickup (GET), /api/admin/orders/past (GET), /api/admin/orders/complete (POST)
+- Created admin/orders/ready-pickup/page.tsx: full order cards with prominent PIN display and 'Mark as Completed' button
+- Built real Past Orders page replacing the static placeholder with data table, search, sort, pagination
+- Updated customer account-store: added completedAt to OrderListItem and OrderDetail types
+- Updated customer account/orders API: added completed_at to select and mapping
+- Added CSS styles: admin-complete-order-btn (green gradient), admin-pagination, admin-table-order-num
+- Fixed broken admin-order-service.ts after accidental truncation (Python script issue)
+
+Stage Summary:
+- Files created: supabase/migrations/010_order_completion.sql, src/app/api/admin/orders/ready-pickup/route.ts, src/app/api/admin/orders/past/route.ts, src/app/api/admin/orders/complete/route.ts, src/app/admin/orders/ready-pickup/page.tsx
+- Files modified: src/components/admin/AdminShell.tsx, src/lib/admin/config.ts, src/services/admin/admin-order-service.ts, src/store/account-store.ts, src/app/api/account/orders/route.ts, src/app/api/account/ongoing-orders/route.ts, src/app/globals.css, src/app/admin/orders/past/page.tsx
+- Build verified: compiled successfully, all new routes appear in build output

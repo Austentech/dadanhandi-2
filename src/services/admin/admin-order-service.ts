@@ -967,3 +967,365 @@ export function isValidTransition(
   if (!allowed) return false
   return allowed.includes(targetStatus as AdminOrderStatus)
 }
+
+// ============================================================================
+// LIST READY FOR PICKUP ORDERS
+// ============================================================================
+
+/**
+ * List only orders in 'ready_for_pickup' status.
+ * Same shape as listOngoingOrders but filtered to a single status.
+ */
+export async function listReadyForPickupOrders(options?: {
+  branchSlug?: string
+  search?: string
+  limit?: number
+  offset?: number
+}): Promise<ListOrdersResult> {
+  try {
+    const supabase = createAdminClient()
+    const limit = options?.limit || 50
+    const offset = options?.offset || 0
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+
+    const selectFields = `
+      *,
+      order_items (*)
+    `
+
+    let query = sb
+      .from('orders')
+      .select(selectFields, { count: 'exact' })
+      .eq('order_status', 'ready_for_pickup')
+      .order('pickup_slot_start', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    if (options?.branchSlug) {
+      query = query.eq('branch_id', options.branchSlug)
+    }
+
+    const { data: orders, error, count } = await query
+
+    if (error) {
+      console.error('[ADMIN ORDER SERVICE] listReadyForPickupOrders error:', error)
+      return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch ready orders' }
+    }
+
+    if (!orders || orders.length === 0) {
+      return { success: true, orders: [], totalCount: 0 }
+    }
+
+    const rawOrders = orders as RawOrderRow[]
+
+    // Batch fetch customer profiles
+    const userIds = [...new Set(rawOrders.map((o) => o.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, auth_user_id, full_name, whatsapp_number, mobile_number')
+      .in('auth_user_id', userIds)
+
+    const profileMap = new Map<string, { name: string; whatsappNumber: string | null; mobileNumber: string | null }>()
+    for (const p of (profiles || []) as RawProfileRow[]) {
+      profileMap.set(p.auth_user_id, {
+        name: p.full_name || 'Customer',
+        whatsappNumber: p.whatsapp_number || null,
+        mobileNumber: p.mobile_number || null,
+      })
+    }
+
+    // Batch fetch branch info
+    const branchIdSet = [...new Set(rawOrders.map((o) => o.branch_id))]
+    const { data: branchRows } = await supabase
+      .from('branches')
+      .select('id, name, slug, city')
+      .in('id', branchIdSet)
+
+    const branchMap = new Map<string, { name: string; slug: string; city: string }>()
+    for (const b of (branchRows || []) as { id: string; name: string; slug: string; city: string }[]) {
+      branchMap.set(b.id, { name: b.name, slug: b.slug, city: b.city })
+    }
+
+    // In-memory search filter
+    let filteredOrders = rawOrders
+    if (options?.search) {
+      const q = options.search.toLowerCase()
+      filteredOrders = filteredOrders.filter((o) => {
+        const orderNum = (o.order_number || '').toLowerCase()
+        const profile = profileMap.get(o.user_id)
+        const customerName = (profile?.name || '').toLowerCase()
+        return orderNum.includes(q) || customerName.includes(q)
+      })
+    }
+
+    // Map to typed response
+    const mapped: AdminOrderWithItems[] = filteredOrders.map((o) => {
+      const profile = profileMap.get(o.user_id)
+      const branch = branchMap.get(o.branch_id)
+      return {
+        ...mapOrderRow(o),
+        items: (o.order_items || []).map(mapOrderItemRow),
+        branch: branch || null,
+        customer: profile || { name: 'Customer', whatsappNumber: null, mobileNumber: null },
+        pickupPin: o.pickup_pin || null,
+        pinGeneratedAt: o.pin_generated_at || null,
+      }
+    })
+
+    return {
+      success: true,
+      orders: mapped,
+      totalCount: count || 0,
+    }
+  } catch (err) {
+    console.error('[ADMIN ORDER SERVICE] listReadyForPickupOrders error:', err)
+    return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch ready orders' }
+  }
+}
+
+// ============================================================================
+// LIST PAST (COMPLETED) ORDERS
+// ============================================================================
+
+export interface AdminPastOrder {
+  id: string
+  orderNumber: string
+  customerName: string
+  branchName: string
+  branchSlug: string | null
+  pickupDate: string
+  pickupSlotStart: string
+  pickupSlotEnd: string
+  finalAmountPaise: number
+  paymentStatus: string
+  pickupPin: string | null
+  completedAt: string | null
+  completedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListPastOrdersResult {
+  success: boolean
+  orders: AdminPastOrder[]
+  totalCount: number
+  error?: string
+}
+
+/**
+ * List completed orders with pagination.
+ * Includes customer name, branch name, pickup PIN, completion info.
+ */
+export async function listPastOrders(options?: {
+  search?: string
+  sortOrder?: 'newest' | 'oldest'
+  limit?: number
+  offset?: number
+}): Promise<ListPastOrdersResult> {
+  try {
+    const supabase = createAdminClient()
+    const limit = options?.limit || 20
+    const offset = options?.offset || 0
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+
+    let query = sb
+      .from('orders')
+      .select('id, order_number, user_id, branch_id, pickup_date, pickup_slot_start, pickup_slot_end, final_amount_paise, payment_status, pickup_pin, completed_at, completed_by, created_at, updated_at', { count: 'exact' })
+      .eq('order_status', 'completed')
+      .order('created_at', { ascending: options?.sortOrder === 'oldest' })
+      .range(offset, offset + limit - 1)
+
+    const { data: orders, error, count } = await query
+
+    if (error) {
+      console.error('[ADMIN ORDER SERVICE] listPastOrders error:', error)
+      return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch past orders' }
+    }
+
+    if (!orders || orders.length === 0) {
+      return { success: true, orders: [], totalCount: 0 }
+    }
+
+    // Batch fetch profiles
+    const userIds = [...new Set(orders.map((o: any) => o.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, auth_user_id, full_name')
+      .in('auth_user_id', userIds)
+
+    const profileMap = new Map<string, string>()
+    for (const p of (profiles || []) as RawProfileRow[]) {
+      profileMap.set(p.auth_user_id, p.full_name || 'Customer')
+    }
+
+    // Batch fetch branches
+    const branchIds = [...new Set(orders.map((o: any) => o.branch_id))]
+    const { data: branchRows } = await supabase
+      .from('branches')
+      .select('id, name, slug')
+      .in('id', branchIds)
+
+    const branchMap = new Map<string, { name: string; slug: string }>()
+    for (const b of (branchRows || []) as { id: string; name: string; slug: string }[]) {
+      branchMap.set(b.id, { name: b.name, slug: b.slug })
+    }
+
+    let filtered = orders as any[]
+    if (options?.search) {
+      const q = options.search.toLowerCase()
+      filtered = filtered.filter((o) => {
+        const num = (o.order_number || '').toLowerCase()
+        const name = (profileMap.get(o.user_id) || '').toLowerCase()
+        return num.includes(q) || name.includes(q)
+      })
+    }
+
+    const mapped: AdminPastOrder[] = filtered.map((o) => {
+      const branch = branchMap.get(o.branch_id)
+      return {
+        id: o.id,
+        orderNumber: o.order_number,
+        customerName: profileMap.get(o.user_id) || 'Customer',
+        branchName: branch?.name || 'Unknown Branch',
+        branchSlug: branch?.slug || null,
+        pickupDate: o.pickup_date,
+        pickupSlotStart: o.pickup_slot_start,
+        pickupSlotEnd: o.pickup_slot_end,
+        finalAmountPaise: o.final_amount_paise,
+        paymentStatus: o.payment_status,
+        pickupPin: o.pickup_pin,
+        completedAt: o.completed_at,
+        completedBy: o.completed_by,
+        createdAt: o.created_at,
+        updatedAt: o.updated_at,
+      }
+    })
+
+    return {
+      success: true,
+      orders: mapped,
+      totalCount: count || 0,
+    }
+  } catch (err) {
+    console.error('[ADMIN ORDER SERVICE] listPastOrders error:', err)
+    return { success: false, orders: [], totalCount: 0, error: 'Failed to fetch past orders' }
+  }
+}
+
+// ============================================================================
+// COMPLETE ORDER
+// ============================================================================
+
+export interface CompleteOrderResult {
+  success: boolean
+  message: string
+  error?: string
+}
+
+/**
+ * Mark an order as completed.
+ *
+ * Workflow:
+ * 1. Validate order exists and is 'ready_for_pickup'
+ * 2. Atomically update: status → 'completed', set completed_at + completed_by
+ * 3. Race condition guard: WHERE order_status = 'ready_for_pickup'
+ * 4. Log in order_status_history
+ *
+ * @param orderId - UUID of the order
+ * @param adminUserId - UUID of the admin completing the order
+ */
+export async function completeOrder(
+  orderId: string,
+  adminUserId: string
+): Promise<CompleteOrderResult> {
+  try {
+    const supabase = createAdminClient()
+
+    if (!orderId || typeof orderId !== 'string') {
+      return { success: false, message: 'Invalid order ID' }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+
+    // Fetch order
+    const { data: order, error: fetchErr }: { data: any; error: any } = await sb
+      .from('orders')
+      .select('id, order_status, pickup_pin')
+      .eq('id', orderId)
+      .single()
+
+    if (fetchErr || !order) {
+      return { success: false, message: 'Order not found' }
+    }
+
+    // Validate status
+    if (order.order_status !== 'ready_for_pickup') {
+      const labels: Record<string, string> = {
+        confirmed: 'Pending', accepted: 'Accepted', preparing: 'Preparing',
+        ready_for_pickup: 'Ready for Pickup', completed: 'Completed',
+        cancelled: 'Cancelled', failed: 'Failed',
+      }
+      const label = labels[order.order_status] || order.order_status
+      if (order.order_status === 'completed') {
+        return { success: false, message: 'Order has already been completed' }
+      }
+      return { success: false, message: `Cannot complete order in "${label}" status` }
+    }
+
+    // Atomic update with optimistic lock
+    const completedAt = new Date().toISOString()
+    const { error: updateErr, count: updateCount } = await sb
+      .from('orders')
+      .update({
+        order_status: 'completed',
+        completed_at: completedAt,
+        completed_by: adminUserId,
+        updated_at: completedAt,
+      })
+      .eq('id', orderId)
+      .eq('order_status', 'ready_for_pickup')
+
+    if (updateErr) {
+      console.error('[ADMIN ORDER SERVICE] completeOrder update error:', updateErr)
+      return { success: false, message: 'Failed to complete order. Please try again.' }
+    }
+
+    if (updateCount === 0) {
+      const { data: fresh }: { data: any } = await sb
+        .from('orders')
+        .select('order_status')
+        .eq('id', orderId)
+        .single()
+      const labels: Record<string, string> = {
+        completed: 'Completed', cancelled: 'Cancelled', confirmed: 'Pending',
+        accepted: 'Accepted', preparing: 'Preparing',
+        ready_for_pickup: 'Ready for Pickup',
+      }
+      const current = labels[fresh?.order_status] || 'Unknown'
+      return { success: false, message: `Order status was already changed to "${current}" by another action` }
+    }
+
+    // Log status history
+    try {
+      const { error: histErr } = await sb.from('order_status_history').insert({
+        order_id: orderId,
+        status: 'completed',
+        note: `Order completed | admin: ${adminUserId}`,
+      })
+      if (histErr && !String(histErr.message || histErr).includes('duplicate')) {
+        console.error('[ADMIN ORDER SERVICE] Failed to log status history:', histErr)
+      }
+    } catch (histErr) {
+      console.error('[ADMIN ORDER SERVICE] Failed to log status history:', histErr)
+    }
+
+    return { success: true, message: 'Order marked as completed' }
+  } catch (err) {
+    console.error('[ADMIN ORDER SERVICE] completeOrder error:', err)
+    return { success: false, message: 'Something went wrong. Please try again.' }
+  }
+}

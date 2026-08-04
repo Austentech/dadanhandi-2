@@ -42,6 +42,8 @@ export const ADMIN_CONFIG = {
     ONGOING_LIST: { maxAttempts: 120, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 },
     /** Pickup PIN generation: 15 requests per minute, block 5 minutes */
     PIN_GENERATE: { maxAttempts: 15, windowMs: 60 * 1000, blockDurationMs: 5 * 60 * 1000 },
+    /** Complete order: 20 requests per minute, block 2 minutes */
+    COMPLETE_ORDER: { maxAttempts: 20, windowMs: 60 * 1000, blockDurationMs: 2 * 60 * 1000 },
   },
 
   /** Session: duration in hours (7 days) */

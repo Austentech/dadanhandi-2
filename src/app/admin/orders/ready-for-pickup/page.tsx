@@ -15,37 +15,11 @@ import {
   RefreshCw,
   User,
   CreditCard,
-  ChefHat,
-  ShieldCheck,
+  KeyRound,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react'
 import type { AdminOrderWithItems } from '@/services/admin/admin-order-service'
-
-// ---------------------------------------------------------------------------
-// Status configuration
-// ---------------------------------------------------------------------------
-
-const STATUS_CONFIG: Record<string, {
-  label: string
-  cssClass: string
-  nextAction: string | null
-  nextStatus: string | null
-  nextIcon: React.ReactNode
-}> = {
-  accepted: {
-    label: 'Accepted',
-    cssClass: 'accepted',
-    nextAction: 'Start Preparing',
-    nextStatus: 'preparing',
-    nextIcon: <ChefHat size={16} />,
-  },
-  preparing: {
-    label: 'Preparing',
-    cssClass: 'preparing',
-    nextAction: 'Verify & Generate Pickup PIN',
-    nextStatus: 'ready_for_pickup',
-    nextIcon: <ShieldCheck size={16} />,
-  },
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -123,42 +97,36 @@ function formatPaymentMethod(method: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Ongoing Order Card
+// Ready for Pickup Order Card
 // ---------------------------------------------------------------------------
 
-function OngoingOrderCard({
+function ReadyOrderCard({
   order,
-  onStatusUpdate,
-  onGeneratePin,
-  updatingId,
-  generatingPinId,
+  onMarkCompleted,
+  completingId,
 }: {
   order: AdminOrderWithItems
-  onStatusUpdate: (orderId: string, targetStatus: string) => void
-  onGeneratePin: (orderId: string) => void
-  updatingId: string | null
-  generatingPinId: string | null
+  onMarkCompleted: (orderId: string) => void
+  completingId: string | null
 }) {
-  const isUpdating = updatingId === order.id
-  const isGeneratingPin = generatingPinId === order.id
+  const isCompleting = completingId === order.id
   const totalDonation = order.donationPlantationPaise + order.donationHungerPaise
   const hasReward = order.rewardPointsRedeemed > 0
-  const statusCfg = STATUS_CONFIG[order.orderStatus]
   const branchContact = order.branch?.slug ? getBranchContact(order.branch.slug) : null
 
   return (
     <div
-      className={`admin-order-card admin-ongoing-card admin-ongoing-card--${statusCfg?.cssClass || ''}`}
+      className="admin-order-card admin-ongoing-card admin-ongoing-card--ready"
       role="article"
-      aria-label={`Order ${order.orderNumber}, status: ${statusCfg?.label || order.orderStatus}`}
+      aria-label={`Order ${order.orderNumber}, ready for pickup`}
     >
       {/* Header row */}
       <div className="admin-order-card-header">
         <div className="admin-order-card-id">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span className="admin-order-number">#{order.orderNumber}</span>
-            <span className={`admin-status-badge ${statusCfg?.cssClass || ''}`}>
-              {statusCfg?.label || order.orderStatus}
+            <span className="admin-status-badge ready">
+              Ready for Pickup
             </span>
           </div>
           <span className="admin-order-time">{timeAgo(order.updatedAt)}</span>
@@ -282,6 +250,22 @@ function OngoingOrderCard({
         )}
       </div>
 
+      {/* Pickup PIN Display */}
+      <div className="admin-pickup-pin-section" aria-label={`Pickup PIN: ${order.pickupPin}`}>
+        <div className="admin-pickup-pin-header">
+          <KeyRound size={14} />
+          <span>Pickup PIN</span>
+        </div>
+        <div className="admin-pickup-pin-display">
+          <span className="admin-pickup-pin-digits">{order.pickupPin}</span>
+          {order.pinGeneratedAt && (
+            <span className="admin-pickup-pin-time">
+              Generated {formatTime(order.pinGeneratedAt)}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Payment status + Action Buttons */}
       <div className="admin-order-card-footer">
         <div className="admin-order-payment-status">
@@ -296,35 +280,20 @@ function OngoingOrderCard({
           </div>
         </div>
 
-        {/* Workflow Action Buttons */}
+        {/* Mark as Completed Button */}
         <div className="admin-order-actions">
-          {order.orderStatus === 'preparing' ? (
-            <button
-              className="admin-order-btn status-action admin-status-btn-preparing admin-pin-generate-btn"
-              onClick={() => onGeneratePin(order.id)}
-              disabled={isGeneratingPin}
-              aria-label={`Verify and generate pickup PIN for order ${order.orderNumber}`}
-            >
-              {isGeneratingPin ? (
-                <><span className="admin-btn-spinner" /> Generating PIN...</>
-              ) : (
-                <><ShieldCheck size={16} /> Verify & Generate Pickup PIN</>
-              )}
-            </button>
-          ) : statusCfg?.nextAction && statusCfg.nextStatus ? (
-            <button
-              className={`admin-order-btn status-action admin-status-btn-${statusCfg.cssClass}`}
-              onClick={() => onStatusUpdate(order.id, statusCfg.nextStatus!)}
-              disabled={isUpdating}
-              aria-label={`${statusCfg.nextAction} for order ${order.orderNumber}`}
-            >
-              {isUpdating ? (
-                <><span className="admin-btn-spinner" /> Updating...</>
-              ) : (
-                <>{statusCfg.nextIcon} {statusCfg.nextAction}</>
-              )}
-            </button>
-          ) : null}
+          <button
+            className="admin-order-btn status-action admin-complete-order-btn"
+            onClick={() => onMarkCompleted(order.id)}
+            disabled={isCompleting}
+            aria-label={`Mark order ${order.orderNumber} as completed`}
+          >
+            {isCompleting ? (
+              <><span className="admin-btn-spinner" /> Completing...</>
+            ) : (
+              <><CheckCircle2 size={16} /> Mark as Completed</>
+            )}
+          </button>
         </div>
       </div>
 
@@ -339,27 +308,26 @@ function OngoingOrderCard({
 }
 
 // ---------------------------------------------------------------------------
-// Ongoing Orders Page
+// Ready for Pickup Page
 // ---------------------------------------------------------------------------
 
-export default function OngoingOrdersPage() {
+export default function ReadyForPickupPage() {
   const [orders, setOrders] = useState<AdminOrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [generatingPinId, setGeneratingPinId] = useState<string | null>(null)
+  const [completingId, setCompletingId] = useState<string | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const { refresh: refreshDashboard } = useAdminDashboard()
 
-  // Fetch ongoing orders
+  // Fetch ready for pickup orders
   const fetchOrders = useCallback(async (searchQuery?: string) => {
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams()
       if (searchQuery) params.set('search', searchQuery)
-      const res = await fetch(`/api/admin/orders/ongoing?${params}`)
+      const res = await fetch(`/api/admin/orders/ready-for-pickup?${params}`)
       if (res.status === 401) return
       const data = await res.json()
       if (data.success) {
@@ -389,26 +357,24 @@ export default function OngoingOrdersPage() {
 
         const supabase = createBrowserClient(supabaseUrl, supabaseKey)
         const channel = supabase
-          .channel('admin-ongoing-orders')
+          .channel('admin-ready-for-pickup')
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'orders' },
             (payload: { eventType: string; new: Record<string, unknown> }) => {
               const newStatus = payload.new?.order_status as string | undefined
-              const ongoingStatuses = ['accepted', 'preparing']
 
               if (payload.eventType === 'UPDATE') {
-                if (newStatus && ongoingStatuses.includes(newStatus)) {
+                if (newStatus === 'ready_for_pickup') {
+                  // New order became ready (PIN generated)
                   fetchOrders(search)
                   refreshDashboard()
-                } else if (newStatus && !ongoingStatuses.includes(newStatus)) {
+                } else if (newStatus === 'completed') {
+                  // Order was completed, remove from list
                   setOrders((prev) => prev.filter((o) => o.id !== payload.new?.id))
                   refreshDashboard()
-                }
-              }
-              if (payload.eventType === 'INSERT') {
-                if (newStatus && ongoingStatuses.includes(newStatus)) {
-                  fetchOrders(search)
+                } else if (newStatus === 'cancelled') {
+                  setOrders((prev) => prev.filter((o) => o.id !== payload.new?.id))
                   refreshDashboard()
                 }
               }
@@ -425,12 +391,12 @@ export default function OngoingOrdersPage() {
     return () => { cleanup?.() }
   }, [fetchOrders, search, refreshDashboard])
 
-  // Auto-refresh every 60 seconds
+  // Auto-refresh every 30 seconds (more frequent since these are time-sensitive)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchOrders(search)
       refreshDashboard()
-    }, 60_000)
+    }, 30_000)
     return () => clearInterval(interval)
   }, [fetchOrders, search, refreshDashboard])
 
@@ -443,52 +409,29 @@ export default function OngoingOrdersPage() {
     }, 400)
   }, [fetchOrders])
 
-  // Status update handler (accepted → preparing)
-  const handleStatusUpdate = useCallback(async (orderId: string, targetStatus: string) => {
-    setUpdatingId(orderId)
+  // Mark as Completed handler
+  const handleMarkCompleted = useCallback(async (orderId: string) => {
+    setCompletingId(orderId)
     try {
-      const res = await fetch('/api/admin/orders/update-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, targetStatus }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setOrders((prev) => prev.filter((o) => o.id !== orderId))
-        refreshDashboard()
-      } else {
-        alert(data.message || 'Failed to update order status')
-      }
-    } catch {
-      alert('Network error. Please try again.')
-    } finally {
-      setUpdatingId(null)
-    }
-  }, [refreshDashboard])
-
-  // Pickup PIN generation handler
-  const handleGeneratePin = useCallback(async (orderId: string) => {
-    setGeneratingPinId(orderId)
-    try {
-      const res = await fetch('/api/admin/orders/generate-pin', {
+      const res = await fetch('/api/admin/orders/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId }),
       })
       const data = await res.json()
       if (data.success) {
-        // Refresh the list to show updated status and PIN
-        fetchOrders(search)
+        // Remove from list immediately
+        setOrders((prev) => prev.filter((o) => o.id !== orderId))
         refreshDashboard()
       } else {
-        alert(data.message || 'Failed to generate pickup PIN')
+        alert(data.message || 'Failed to complete order')
       }
     } catch {
       alert('Network error. Please try again.')
     } finally {
-      setGeneratingPinId(null)
+      setCompletingId(null)
     }
-  }, [fetchOrders, search, refreshDashboard])
+  }, [refreshDashboard])
 
   // Client-side search filter
   const displayOrders = search
@@ -501,28 +444,21 @@ export default function OngoingOrdersPage() {
       })
     : orders
 
-  // Count by status
-  const acceptedCount = orders.filter((o) => o.orderStatus === 'accepted').length
-  const preparingCount = orders.filter((o) => o.orderStatus === 'preparing').length
-
   return (
     <AdminShell>
-      <h1 className="admin-page-title">Ongoing Orders</h1>
+      <h1 className="admin-page-title">Ready for Pickup</h1>
       <p className="admin-page-subtitle">
-        Accepted and preparing orders
+        Orders with pickup PIN generated, awaiting customer collection
         {orders.length > 0 && (
           <span className="admin-order-count-badge">{orders.length}</span>
         )}
       </p>
 
-      {/* Status summary chips */}
+      {/* Status summary chip */}
       {orders.length > 0 && (
         <div className="admin-ongoing-summary">
-          <span className="admin-ongoing-chip accepted">
-            <ChefHat size={13} /> {acceptedCount} Accepted
-          </span>
-          <span className="admin-ongoing-chip preparing">
-            <ChefHat size={13} /> {preparingCount} Preparing
+          <span className="admin-ongoing-chip ready">
+            <Clock size={13} /> {orders.length} Awaiting Collection
           </span>
         </div>
       )}
@@ -575,25 +511,23 @@ export default function OngoingOrdersPage() {
           <div className="admin-empty-state">
             <Package size={56} className="admin-empty-state-icon" />
             <div className="admin-empty-state-title">
-              {search ? 'No matching orders' : 'No ongoing orders'}
+              {search ? 'No matching orders' : 'No orders ready for pickup'}
             </div>
             <div className="admin-empty-state-desc">
               {search
                 ? 'Try adjusting your search terms.'
-                : 'Accepted orders will appear here as they progress through the kitchen.'}
+                : 'Orders will appear here once a pickup PIN is generated.'}
             </div>
           </div>
         </div>
       ) : (
         <div className="admin-orders-grid">
           {displayOrders.map((order) => (
-            <OngoingOrderCard
+            <ReadyOrderCard
               key={order.id}
               order={order}
-              onStatusUpdate={handleStatusUpdate}
-              onGeneratePin={handleGeneratePin}
-              updatingId={updatingId}
-              generatingPinId={generatingPinId}
+              onMarkCompleted={handleMarkCompleted}
+              completingId={completingId}
             />
           ))}
         </div>

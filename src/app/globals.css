@@ -7044,6 +7044,22 @@ a, p, span, div {
   transform: translateY(0);
 }
 
+/* Mark as Completed button */
+.admin-complete-order-btn {
+  background: linear-gradient(135deg, #059669, #10b981) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+.admin-complete-order-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857, #059669) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+.admin-complete-order-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
 /* Pickup PIN Display Section (inside order card) */
 .admin-pickup-pin-section {
   margin: 0 16px;

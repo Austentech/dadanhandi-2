@@ -1,6 +1,6 @@
 /**
- * GET /api/admin/orders/ready-pickup?branch=slug&search=query&limit=50&offset=0
- * Lists all orders in 'ready_for_pickup' status with items, customer, and branch info.
+ * GET /api/admin/orders/ready-for-pickup?search=query&limit=50&offset=0
+ * Lists all orders in 'ready_for_pickup' status.
  * Protected: requires valid admin session.
  * Rate limited: 120 requests per minute.
  */
@@ -12,19 +12,18 @@ import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 export async function GET(request: Request) {
   const auth = await validateAdminRequest(request, {
-    rateLimitType: 'admin_ready_pickup_list',
-    rateLimitConfig: ADMIN_CONFIG.RATE_LIMITS.READY_PICKUP_LIST,
+    rateLimitType: 'admin_ongoing_list',
+    rateLimitConfig: ADMIN_CONFIG.RATE_LIMITS.ONGOING_LIST,
   })
   if (!auth.valid) return auth.errorResponse!
 
+  // Parse query params
   const { searchParams } = new URL(request.url)
-  const branch = searchParams.get('branch') || undefined
   const search = searchParams.get('search') || undefined
   const limit = Math.min(Number(searchParams.get('limit')) || 50, 100)
   const offset = Math.max(Number(searchParams.get('offset')) || 0, 0)
 
   const result = await listReadyForPickupOrders({
-    branchSlug: branch,
     search,
     limit,
     offset,

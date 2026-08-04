@@ -657,9 +657,12 @@ export async function acceptOrder(
 // ============================================================================
 
 /**
- * List all ongoing orders (accepted, preparing, ready_for_pickup).
+ * List all ongoing orders (accepted, preparing).
  * Includes items, customer info, branch info, and accepted-at timestamp.
  * Ordered by pickup time (soonest first), then by status priority.
+ *
+ * Note: ready_for_pickup orders have their own dedicated page
+ * and are fetched via listReadyForPickupOrders().
  */
 export async function listOngoingOrders(options?: {
   branchSlug?: string
@@ -683,7 +686,7 @@ export async function listOngoingOrders(options?: {
     let query = sb
       .from('orders')
       .select(selectFields, { count: 'exact' })
-      .in('order_status', ['accepted', 'preparing', 'ready_for_pickup'])
+      .in('order_status', ['accepted', 'preparing'])
       .order('pickup_slot_start', { ascending: true })
       .range(offset, offset + limit - 1)
 
@@ -760,11 +763,10 @@ export async function listOngoingOrders(options?: {
       })
     }
 
-    // --- Status priority for sorting (accepted=1, preparing=2, ready=3) ---
+    // --- Status priority for sorting (accepted=1, preparing=2) ---
     const statusWeight: Record<string, number> = {
       accepted: 1,
       preparing: 2,
-      ready_for_pickup: 3,
     }
 
     // --- Map to typed response ---

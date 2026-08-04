@@ -652,3 +652,27 @@ Stage Summary:
 - Files created: supabase/migrations/010_order_completion.sql, src/app/api/admin/orders/ready-pickup/route.ts, src/app/api/admin/orders/past/route.ts, src/app/api/admin/orders/complete/route.ts, src/app/admin/orders/ready-pickup/page.tsx
 - Files modified: src/components/admin/AdminShell.tsx, src/lib/admin/config.ts, src/services/admin/admin-order-service.ts, src/store/account-store.ts, src/app/api/account/orders/route.ts, src/app/api/account/ongoing-orders/route.ts, src/app/globals.css, src/app/admin/orders/past/page.tsx
 - Build verified: compiled successfully, all new routes appear in build output
+---
+Task ID: 6-fix-ready-pickup-flow
+Agent: main
+Task: Fix Ready for Pickup flow - remove ready_for_pickup from Ongoing, create dedicated Ready for Pickup page, add Mark as Completed, update Past Orders
+
+Work Log:
+- Fixed `listOngoingOrders` in admin-order-service.ts: changed status filter from ['accepted', 'preparing', 'ready_for_pickup'] to ['accepted', 'preparing']
+- Updated Ongoing Orders page: removed ready_for_pickup from STATUS_CONFIG, removed PIN display section, removed ready count chip, updated realtime filter, cleaned unused imports (CheckCircle, Clock, KeyRound)
+- Added COMPLETE_ORDER rate limit to config.ts (20 req/min, 2 min block)
+- Created GET /api/admin/orders/ready-for-pickup API route using listReadyForPickupOrders
+- Created Ready for Pickup admin page at /admin/orders/ready-for-pickup with: order cards showing full details + PIN, "Mark as Completed" button, realtime subscription (adds on ready_for_pickup, removes on completed/cancelled), 30s auto-refresh, search
+- Added `.admin-complete-order-btn` CSS (green gradient) to globals.css
+- Updated AdminShell sidebar: added "Ready for Pickup" nav item with KeyRound icon between Ongoing and Past Orders
+- Rewrote Past Orders page from disabled placeholder to functional page: real data from /api/admin/orders/past, search, sort toggle (newest/oldest), pagination, realtime subscription for new completions
+- Fixed /api/admin/orders/past route: changed missing PAST_LIST config to ONGOING_LIST
+- Removed duplicate old placeholder directories: admin/orders/ready-pickup, api/admin/orders/ready-pickup, api/admin/orders/past-orders
+- Final build verified: all routes clean, no duplicates
+
+Stage Summary:
+- Ongoing page now only shows accepted + preparing orders
+- Ready for Pickup is a dedicated page with PIN display and Mark as Completed action
+- Past Orders shows real completed order data with table, search, sort, pagination
+- Sidebar navigation updated with all 5 order sections
+- Build passes cleanly with correct route structure

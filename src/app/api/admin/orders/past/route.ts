@@ -12,8 +12,8 @@ import { ADMIN_CONFIG } from '@/lib/admin/config'
 
 export async function GET(request: Request) {
   const auth = await validateAdminRequest(request, {
-    rateLimitType: 'admin_past_list',
-    rateLimitConfig: ADMIN_CONFIG.RATE_LIMITS.PAST_LIST,
+    rateLimitType: 'admin_ongoing_list',
+    rateLimitConfig: ADMIN_CONFIG.RATE_LIMITS.ONGOING_LIST,
   })
   if (!auth.valid) return auth.errorResponse!
 

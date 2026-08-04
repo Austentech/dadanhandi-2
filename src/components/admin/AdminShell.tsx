@@ -20,6 +20,7 @@ import {
   CheckCircle,
   AlertCircle,
   ChefHat,
+  KeyRound,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
 const ORDER_ITEMS: NavItem[] = [
   { label: 'New Orders', href: '/admin/orders/new', icon: <Package size={18} /> },
   { label: 'Ongoing', href: '/admin/orders/ongoing', icon: <Truck size={18} /> },
+  { label: 'Ready for Pickup', href: '/admin/orders/ready-for-pickup', icon: <KeyRound size={18} /> },
   { label: 'Past Orders', href: '/admin/orders/past', icon: <Archive size={18} /> },
   { label: 'Cancelled', href: '/admin/orders/cancelled', icon: <XCircle size={18} /> },
 ]
